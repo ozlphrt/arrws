@@ -33,14 +33,8 @@ export class Snake {
   }
 
   generateColor() {
-    const colors = [
-      '#edc22e', // Gold
-      '#f65e3b', // Red-orange
-      '#edcf72', // Yellow
-      '#f67c5f', // Coral
-      '#f59563', // Orange-peach
-    ];
-    return colors[Math.floor(Math.random() * colors.length)];
+    // All snakes are red
+    return '#f65e3b'; // Red-orange
   }
 
   getHead() {

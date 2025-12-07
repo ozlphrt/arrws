@@ -65,9 +65,8 @@ function App() {
     if (lives > 0) {
       setLives(prev => {
         const newLives = prev - 1;
-        if (newLives === 0) {
-          setRemoveMode(false);
-        }
+        // Turn off remove mode after removing a snake
+        setRemoveMode(false);
         return newLives;
       });
     }
