@@ -4,7 +4,7 @@ import { Snake, generateRandomSnake, isPuzzleSolvable } from '../utils/snake';
 const ROWS = 36;
 const COLS = 18;
 
-const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpdate, onGameStart, removeMode = false, onSnakeRemoved, onUndoStateChange, onAllSnakesCleared }, ref) {
+const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpdate, onGameStart, removeMode = false, onSnakeRemoved, onUndoStateChange, onAllSnakesCleared, level = 1 }, ref) {
   const canvasRef = useRef(null);
   const dotsRef = useRef([]);
   const animationFrameRef = useRef(null);
@@ -395,8 +395,30 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
         // Check for head-to-head collision first
         const headToHeadSnake = snakeCopy.checkHeadToHeadCollision(allSnakesCopy, ROWS, COLS);
         if (headToHeadSnake) {
-          // Head-to-head collision detected - change direction
-          const directionChanged = snakeCopy.changeDirectionToPerpendicular(ROWS, COLS, allSnakesCopy);
+          // Head-to-head collision detected
+          // Find the other snake's index to check if it's also moving
+          const otherSnakeIndex = prevSnakes.findIndex((s, idx) => 
+            idx !== snakeIndex && s && headToHeadSnake && 
+            s.getHead().row === headToHeadSnake.getHead().row &&
+            s.getHead().col === headToHeadSnake.getHead().col
+          );
+          const otherSnakeIsMoving = otherSnakeIndex !== -1 && 
+            animationIntervalsRef.current.has(otherSnakeIndex);
+          
+          let directionChanged;
+          // Use snake index to deterministically decide turn direction to avoid deadlock
+          // Lower index turns clockwise, higher index turns counter-clockwise
+          if (otherSnakeIsMoving && snakeIndex < otherSnakeIndex) {
+            // This snake has lower index - turn clockwise
+            directionChanged = snakeCopy.changeDirectionClockwise(ROWS, COLS, allSnakesCopy);
+          } else if (otherSnakeIsMoving && snakeIndex > otherSnakeIndex) {
+            // This snake has higher index - turn counter-clockwise to break deadlock
+            directionChanged = snakeCopy.tryCounterClockwiseOrOther(ROWS, COLS, allSnakesCopy, snakeCopy.direction, snakeCopy.getHead());
+          } else {
+            // Only this snake is moving, or other snake is not moving - turn clockwise
+            directionChanged = snakeCopy.changeDirectionClockwise(ROWS, COLS, allSnakesCopy);
+          }
+          
           if (directionChanged) {
             // Direction changed successfully, continue with movement
             const moved = snakeCopy.move(ROWS, COLS, allSnakesCopy);
@@ -626,6 +648,8 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
     // Only trigger if game has started and all snakes are cleared, and modal hasn't been shown yet
     if (gameStartCalledRef.current && snakes.length === 0 && initialSnakeCountRef.current > 0 && !completionModalShownRef.current && onAllSnakesCleared) {
       completionModalShownRef.current = true;
+      // Clear progress to prevent "Initializing..." from showing
+      setProgress(null);
       // Small delay to ensure state is settled
       const timeoutId = setTimeout(() => {
         onAllSnakesCleared();
@@ -696,7 +720,8 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
     let initTimer;
     
     // Show progress immediately if no snakes
-    if (snakes.length === 0) {
+    // But don't generate if completion modal is shown or if we just completed a level
+    if (snakes.length === 0 && !completionModalShownRef.current && initialSnakeCountRef.current === 0) {
       console.log('Setting initial progress');
       setProgress({ phase: 'generating', progress: 0, message: 'Initializing...' });
       
@@ -709,16 +734,43 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
           // Yield to browser to allow initial render
           await new Promise(resolve => setTimeout(resolve, 0));
           
+          // Calculate difficulty parameters based on level
+          // Snake length distribution: Early (3-15), Mid (5-25), Late (10-40)
+          let minLength, maxLength;
+          if (level <= 5) {
+            minLength = 3;
+            maxLength = 15;
+          } else if (level <= 15) {
+            minLength = 5;
+            maxLength = 25;
+          } else {
+            minLength = 10;
+            maxLength = 40;
+          }
+          
+          // Grid density: Early (70-80%), Mid (80-85%), Late (85-90%)
+          let targetCoverage;
+          if (level <= 5) {
+            targetCoverage = 0.70 + (level - 1) * 0.02; // 70% to 78%
+          } else if (level <= 15) {
+            targetCoverage = 0.80 + ((level - 5) / 10) * 0.05; // 80% to 85%
+          } else {
+            targetCoverage = 0.85 + ((level - 15) / 10) * 0.05; // 85% to 90% (capped)
+          }
+          targetCoverage = Math.min(0.90, targetCoverage);
+          
           const maxPuzzleAttempts = 10; // Try up to 10 times to generate a solvable puzzle
           
           for (let puzzleAttempt = 0; puzzleAttempt < maxPuzzleAttempts; puzzleAttempt++) {
           // Report generation attempt progress
-          const attemptProgress = Math.floor((puzzleAttempt / maxPuzzleAttempts) * 40);
+          const attemptProgress = Math.floor((puzzleAttempt / maxPuzzleAttempts) * 30);
           setProgress({ 
             phase: 'generating', 
             progress: attemptProgress, 
             message: `Generating puzzle... (attempt ${puzzleAttempt + 1}/${maxPuzzleAttempts})` 
           });
+          
+          await new Promise(resolve => setTimeout(resolve, 50));
           
           const occupiedPositions = new Set();
           const newSnakes = [];
@@ -729,7 +781,7 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
           
           // Keep generating snakes until we fill most of the grid or can't place more
           while (attempts < maxAttempts) {
-            const snake = generateRandomSnake(ROWS, COLS, 3, 50, occupiedPositions, newSnakes);
+            const snake = generateRandomSnake(ROWS, COLS, minLength, maxLength, occupiedPositions, newSnakes);
             if (snake) {
               newSnakes.push(snake);
               snakesPlaced++;
@@ -738,15 +790,43 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
               
               // Report progress during generation
               const coverage = occupiedPositions.size / totalDots;
-              const genProgress = attemptProgress + Math.floor((coverage / 0.8) * 10);
-              setProgress({ 
-                phase: 'generating', 
-                progress: Math.min(40, genProgress), 
-                message: `Placing snakes... (${snakesPlaced} placed)` 
-              });
+              const coveragePercent = Math.round(coverage * 100);
+              const targetPercent = Math.round(targetCoverage * 100);
+              const genProgress = attemptProgress + Math.floor((coverage / targetCoverage) * 10);
               
-              // If we've covered 80%+ of the grid, we're good
-              if (coverage >= 0.8) {
+              // Calculate better estimate: use actual average length of placed snakes
+              let estimatedTargetSnakes = snakesPlaced;
+              if (snakesPlaced > 0) {
+                const totalLength = newSnakes.reduce((sum, s) => sum + s.gridPositions.length, 0);
+                const avgLength = totalLength / snakesPlaced;
+                const remainingCoverage = targetCoverage - coverage;
+                if (remainingCoverage > 0 && avgLength > 0) {
+                  const remainingDots = remainingCoverage * totalDots;
+                  const estimatedRemaining = Math.ceil(remainingDots / avgLength);
+                  estimatedTargetSnakes = snakesPlaced + estimatedRemaining;
+                } else {
+                  // We're at or past target, estimate is current count
+                  estimatedTargetSnakes = snakesPlaced;
+                }
+              } else {
+                // Initial estimate based on target coverage and average expected length
+                const avgLength = (minLength + maxLength) / 2;
+                estimatedTargetSnakes = Math.ceil((targetCoverage * totalDots) / avgLength);
+              }
+              
+              // Update progress periodically
+              if (snakesPlaced % 2 === 0 || snakesPlaced === 1) {
+                setProgress({ 
+                  phase: 'generating', 
+                  progress: Math.min(90, genProgress), 
+                  message: `Placing snakes... (${snakesPlaced}${coveragePercent < targetPercent ? ` of ~${estimatedTargetSnakes}` : ''})` 
+                });
+                // Yield to browser for smoother UI
+                await new Promise(resolve => setTimeout(resolve, 10));
+              }
+              
+              // If we've reached target coverage, we're good
+              if (coverage >= targetCoverage) {
                 break;
               }
             } else {
@@ -760,13 +840,17 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
           
           // No validation needed - reverse generation guarantees solvability!
           if (newSnakes.length > 0) {
-            setProgress({ phase: 'complete', progress: 100, message: 'Puzzle ready!' });
+            setProgress({ 
+              phase: 'complete', 
+              progress: 100, 
+              message: `Puzzle ready! (${newSnakes.length} snakes)` 
+            });
             setTimeout(() => {
               setSnakes(newSnakes);
               snakesRef.current = newSnakes;
               initialSnakeCountRef.current = newSnakes.length;
               setProgress(null);
-            }, 300);
+            }, 500);
             return; // Success - puzzle is guaranteed solvable
           }
           }
@@ -781,12 +865,12 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
           const maxAttempts = 1000;
           
           while (attempts < maxAttempts) {
-            const snake = generateRandomSnake(ROWS, COLS, 3, 50, occupiedPositions, newSnakes);
+            const snake = generateRandomSnake(ROWS, COLS, minLength, maxLength, occupiedPositions, newSnakes);
             if (snake) {
               newSnakes.push(snake);
               snake.getOccupiedPositions().forEach(pos => occupiedPositions.add(pos));
               const coverage = occupiedPositions.size / totalDots;
-              if (coverage >= 0.8) {
+              if (coverage >= targetCoverage) {
                 break;
               }
             } else {
@@ -797,17 +881,21 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
             }
           }
           
-          setProgress({ phase: 'complete', progress: 100, message: 'Puzzle ready!' });
+          setProgress({ 
+            phase: 'complete', 
+            progress: 100, 
+            message: `Puzzle ready! (${newSnakes.length} snakes)` 
+          });
           setTimeout(() => {
             setSnakes(newSnakes);
             snakesRef.current = newSnakes;
             initialSnakeCountRef.current = newSnakes.length;
             historyRef.current = []; // Clear history on new puzzle
             if (onUndoStateChange) {
-              onUndoStateChange(false);
+              pendingUndoStateChangeRef.current = false;
             }
             setProgress(null);
-          }, 300);
+          }, 500);
         } catch (error) {
           console.error('Error generating puzzle:', error);
           setProgress({ phase: 'error', progress: 0, message: 'Error generating puzzle. Please refresh.' });
@@ -818,13 +906,30 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
           let attempts = 0;
           const maxAttempts = 1000;
           
+          // Use same difficulty parameters for fallback
+          let minLength, maxLength, targetCoverage;
+          if (level <= 5) {
+            minLength = 3;
+            maxLength = 15;
+            targetCoverage = 0.70 + (level - 1) * 0.02;
+          } else if (level <= 15) {
+            minLength = 5;
+            maxLength = 25;
+            targetCoverage = 0.80 + ((level - 5) / 10) * 0.05;
+          } else {
+            minLength = 10;
+            maxLength = 40;
+            targetCoverage = 0.85 + ((level - 15) / 10) * 0.05;
+          }
+          targetCoverage = Math.min(0.90, targetCoverage);
+          
           while (attempts < maxAttempts) {
-            const snake = generateRandomSnake(ROWS, COLS, 3, 50, occupiedPositions, newSnakes);
+            const snake = generateRandomSnake(ROWS, COLS, minLength, maxLength, occupiedPositions, newSnakes);
             if (snake) {
               newSnakes.push(snake);
               snake.getOccupiedPositions().forEach(pos => occupiedPositions.add(pos));
               const coverage = occupiedPositions.size / totalDots;
-              if (coverage >= 0.8) {
+              if (coverage >= targetCoverage) {
                 break;
               }
             } else {
@@ -871,7 +976,7 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
       });
       animationIntervalsRef.current.clear();
     };
-  }, [resizeCanvas, snakes.length]);
+  }, [resizeCanvas, snakes.length, level]);
 
   // Animation loop for smooth rendering
   useEffect(() => {

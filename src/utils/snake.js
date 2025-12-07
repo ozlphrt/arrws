@@ -170,6 +170,141 @@ export class Snake {
     return false;
   }
 
+  changeDirectionClockwise(rows, cols, allSnakes) {
+    const currentDir = this.direction;
+    const head = this.getHead();
+    
+    // Determine clockwise direction based on current direction
+    // RIGHT -> DOWN -> LEFT -> UP -> RIGHT
+    let clockwiseDir;
+    if (currentDir === DIRECTIONS.RIGHT) {
+      clockwiseDir = DIRECTIONS.DOWN;
+    } else if (currentDir === DIRECTIONS.DOWN) {
+      clockwiseDir = DIRECTIONS.LEFT;
+    } else if (currentDir === DIRECTIONS.LEFT) {
+      clockwiseDir = DIRECTIONS.UP;
+    } else if (currentDir === DIRECTIONS.UP) {
+      clockwiseDir = DIRECTIONS.RIGHT;
+    } else {
+      // Fallback to perpendicular if direction is unknown
+      return this.changeDirectionToPerpendicular(rows, cols, allSnakes);
+    }
+    
+    // Check if clockwise direction is safe
+    const testRow = head.row + clockwiseDir.row;
+    const testCol = head.col + clockwiseDir.col;
+    
+    // Snakes can move off-screen, so we allow off-screen turns
+    // Only check collisions for on-screen positions
+    const isOnScreen = testRow >= 0 && testRow < rows && testCol >= 0 && testCol < cols;
+    
+    // Check collision with other snakes (only for on-screen positions)
+    if (isOnScreen) {
+      for (const snake of allSnakes) {
+        if (snake === this) continue;
+        
+        for (let i = 0; i < snake.gridPositions.length; i++) {
+          const pos = snake.gridPositions[i];
+          if (pos.row >= 0 && pos.row < rows && pos.col >= 0 && pos.col < cols) {
+            if (pos.row === testRow && pos.col === testCol) {
+              // Allow moving into other snake's tail
+              const tail = snake.getTail();
+              if (testRow === tail.row && testCol === tail.col) {
+                continue;
+              }
+              // Clockwise would collide on-screen, try counter-clockwise
+              return this.tryCounterClockwiseOrOther(rows, cols, allSnakes, currentDir, head);
+            }
+          }
+        }
+      }
+      
+      // Check self-collision (excluding tail) - only for on-screen
+      const tail = this.getTail();
+      for (let i = 1; i < this.gridPositions.length; i++) {
+        const pos = this.gridPositions[i];
+        if (pos.row >= 0 && pos.row < rows && pos.col >= 0 && pos.col < cols) {
+          if (pos.row === testRow && pos.col === testCol) {
+            // Allow moving into own tail
+            if (testRow === tail.row && testCol === tail.col) {
+              continue;
+            }
+            // Clockwise would collide on-screen, try counter-clockwise
+            return this.tryCounterClockwiseOrOther(rows, cols, allSnakes, currentDir, head);
+          }
+        }
+      }
+    }
+    
+    // Clockwise direction is safe (even if off-screen, snakes can move off-screen)
+    this.direction = clockwiseDir;
+    return true;
+  }
+
+  tryCounterClockwiseOrOther(rows, cols, allSnakes, currentDir, head) {
+    // Try counter-clockwise direction
+    let counterClockwiseDir;
+    if (currentDir === DIRECTIONS.RIGHT) {
+      counterClockwiseDir = DIRECTIONS.UP;
+    } else if (currentDir === DIRECTIONS.DOWN) {
+      counterClockwiseDir = DIRECTIONS.RIGHT;
+    } else if (currentDir === DIRECTIONS.LEFT) {
+      counterClockwiseDir = DIRECTIONS.DOWN;
+    } else if (currentDir === DIRECTIONS.UP) {
+      counterClockwiseDir = DIRECTIONS.LEFT;
+    } else {
+      // Fallback to perpendicular
+      return this.changeDirectionToPerpendicular(rows, cols, allSnakes);
+    }
+    
+    const testRow = head.row + counterClockwiseDir.row;
+    const testCol = head.col + counterClockwiseDir.col;
+    
+    // Check bounds
+    if (testRow < 0 || testRow >= rows || testCol < 0 || testCol >= cols) {
+      // Counter-clockwise is off-screen, try perpendicular
+      return this.changeDirectionToPerpendicular(rows, cols, allSnakes);
+    }
+    
+    // Check collision with other snakes
+    for (const snake of allSnakes) {
+      if (snake === this) continue;
+      
+      for (let i = 0; i < snake.gridPositions.length; i++) {
+        const pos = snake.gridPositions[i];
+        if (pos.row >= 0 && pos.row < rows && pos.col >= 0 && pos.col < cols) {
+          if (pos.row === testRow && pos.col === testCol) {
+            const tail = snake.getTail();
+            if (testRow === tail.row && testCol === tail.col) {
+              continue;
+            }
+            // Counter-clockwise would collide, try perpendicular
+            return this.changeDirectionToPerpendicular(rows, cols, allSnakes);
+          }
+        }
+      }
+    }
+    
+    // Check self-collision
+    const tail = this.getTail();
+    for (let i = 1; i < this.gridPositions.length; i++) {
+      const pos = this.gridPositions[i];
+      if (pos.row >= 0 && pos.row < rows && pos.col >= 0 && pos.col < cols) {
+        if (pos.row === testRow && pos.col === testCol) {
+          if (testRow === tail.row && testCol === tail.col) {
+            continue;
+          }
+          // Counter-clockwise would collide, try perpendicular
+          return this.changeDirectionToPerpendicular(rows, cols, allSnakes);
+        }
+      }
+    }
+    
+    // Counter-clockwise direction is safe
+    this.direction = counterClockwiseDir;
+    return true;
+  }
+
   canMove(rows, cols, occupiedPositions) {
     const head = this.getHead();
     const nextRow = head.row + this.direction.row;

@@ -11,6 +11,7 @@ function App() {
   const [lives, setLives] = useState(3);
   const [canUndo, setCanUndo] = useState(false);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [level, setLevel] = useState(1);
   const timeIntervalRef = useRef(null);
   const resetKeyRef = useRef(0);
   const dotCanvasRef = useRef(null);
@@ -44,6 +45,7 @@ function App() {
     setRemoveMode(false);
     setLives(3);
     setShowCompletionModal(false);
+    setLevel(1);
     resetKeyRef.current += 1;
     
     // Clear timer
@@ -96,8 +98,30 @@ function App() {
 
   const handleNext = useCallback(() => {
     setShowCompletionModal(false);
-    handleNewGame();
-  }, [handleNewGame]);
+    
+    // Delay reset to allow modal to close first
+    setTimeout(() => {
+      // Increment level instead of resetting
+      setLevel(prev => prev + 1);
+      setGameStarted(false);
+      setScore(0);
+      setTime(0);
+      setRemoveMode(false);
+      setLives(3);
+      resetKeyRef.current += 1;
+      
+      // Clear timer
+      if (timeIntervalRef.current) {
+        clearInterval(timeIntervalRef.current);
+        timeIntervalRef.current = null;
+      }
+
+      // Reset canvas for next level
+      if (dotCanvasRef.current) {
+        dotCanvasRef.current.reset();
+      }
+    }, 300); // Wait for modal close animation
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -127,11 +151,16 @@ function App() {
           onSnakeRemoved={handleSnakeRemoved}
           onUndoStateChange={handleUndoStateChange}
           onAllSnakesCleared={handleAllSnakesCleared}
+          level={level}
         />
       </main>
       <footer className="footer">
         <div className="footer-content">
           <div className="footer-stats">
+            <div className="stat-item">
+              <span className="stat-label">Level</span>
+              <span className="stat-value">{level}</span>
+            </div>
             <div className="stat-item">
               <span className="stat-label">Time</span>
               <span className="stat-value">{formatTime(time)}</span>
@@ -161,7 +190,7 @@ function App() {
       {showCompletionModal && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <h2 className="modal-title">Level Complete!</h2>
+            <h2 className="modal-title">Level {level} Complete!</h2>
             <p className="modal-message">All snakes have been cleared.</p>
             <button className="modal-next-btn" onClick={handleNext}>
               Next
