@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico'],
+      includeAssets: ['192.png', '512.png'],
       manifest: {
         name: 'ARROWS',
         short_name: 'ARROWS',
