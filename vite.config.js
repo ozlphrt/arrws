@@ -17,15 +17,17 @@ export default defineConfig({
         background_color: '#9a8a76',
         display: 'standalone',
         orientation: 'any',
+        start_url: '/arrws/',
+        scope: '/arrws/',
         icons: [
           {
-            src: 'icon-192.png',
+            src: '192.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any maskable'
           },
           {
-            src: 'icon-512.png',
+            src: '512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any maskable'
@@ -33,7 +35,24 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg}']
+        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/ozlphrt\.github\.io\/arrws\/.*/i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'arrws-cache',
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 60 * 24 * 7 // 7 days
+              }
+            }
+          }
+        ]
+      },
+      devOptions: {
+        enabled: true,
+        type: 'module'
       }
     })
   ],
