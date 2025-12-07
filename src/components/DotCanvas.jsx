@@ -1,10 +1,10 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback, useState, forwardRef, useImperativeHandle } from 'react';
 import { Snake, generateRandomSnake, isPuzzleSolvable } from '../utils/snake';
 
 const ROWS = 36;
 const COLS = 18;
 
-function DotCanvas({ onTap, tapPosition }) {
+const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpdate, onGameStart, removeMode = false, onSnakeRemoved }, ref) {
   const canvasRef = useRef(null);
   const dotsRef = useRef([]);
   const animationFrameRef = useRef(null);
@@ -16,6 +16,7 @@ function DotCanvas({ onTap, tapPosition }) {
   const hoveredSnakeIndexRef = useRef(null); // Keep ref in sync for click accuracy
   const gridMapRef = useRef(new Map()); // Maps {row, col} to {x, y}
   const [progress, setProgress] = useState(null); // { phase, progress, message }
+  const initialSnakeCountRef = useRef(0); // Track initial snake count for score calculation
 
   const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -408,8 +409,13 @@ function DotCanvas({ onTap, tapPosition }) {
           }
           animationStatesRef.current.delete(snakeIndex);
           
-          // Remove the snake
-          return prevSnakes.filter((_, idx) => idx !== snakeIndex);
+          // Remove the snake and update score
+          const updated = prevSnakes.filter((_, idx) => idx !== snakeIndex);
+          if (onScoreUpdate && initialSnakeCountRef.current > 0) {
+            const removed = initialSnakeCountRef.current - updated.length;
+            onScoreUpdate(removed);
+          }
+          return updated;
         }
         
         const moved = snakeCopy.move(ROWS, COLS, allSnakesCopy);
@@ -435,8 +441,13 @@ function DotCanvas({ onTap, tapPosition }) {
           }
           animationStatesRef.current.delete(snakeIndex);
           
-          // Remove the snake
-          return prevSnakes.filter((_, idx) => idx !== snakeIndex);
+          // Remove the snake and update score
+          const updated = prevSnakes.filter((_, idx) => idx !== snakeIndex);
+          if (onScoreUpdate && initialSnakeCountRef.current > 0) {
+            const removed = initialSnakeCountRef.current - updated.length;
+            onScoreUpdate(removed);
+          }
+          return updated;
         }
         
         if (!moved) {
@@ -512,6 +523,40 @@ function DotCanvas({ onTap, tapPosition }) {
       }
       
       if (snakeIndex !== null) {
+        // If in remove mode, remove the snake instead of moving it
+        if (removeMode) {
+          setSnakes(prevSnakes => {
+            if (snakeIndex < prevSnakes.length) {
+              // Clean up animation intervals
+              const interval = animationIntervalsRef.current.get(snakeIndex);
+              if (interval) {
+                clearInterval(interval);
+                animationIntervalsRef.current.delete(snakeIndex);
+              }
+              animationStatesRef.current.delete(snakeIndex);
+              
+              // Remove the snake
+              const updated = prevSnakes.filter((_, idx) => idx !== snakeIndex);
+              snakesRef.current = updated;
+              
+              // Notify parent that a snake was removed
+              if (onSnakeRemoved) {
+                onSnakeRemoved();
+              }
+              
+              // Vibrate for feedback
+              if ('vibrate' in navigator) {
+                navigator.vibrate(100);
+              }
+              
+              return updated;
+            }
+            return prevSnakes;
+          });
+          return; // Don't proceed with normal click handling
+        }
+        
+        // Normal mode: start snake movement
         setSnakes(prevSnakes => {
           if (snakeIndex < prevSnakes.length) {
             setTimeout(() => {
@@ -564,7 +609,7 @@ function DotCanvas({ onTap, tapPosition }) {
       canvas.removeEventListener('touchstart', handleTouch);
       canvas.removeEventListener('touchmove', handleTouch);
     };
-  }, [findSnakeAtPosition, startSnakeMovement, onTap, hoveredSnakeIndex]);
+  }, [findSnakeAtPosition, startSnakeMovement, onTap, hoveredSnakeIndex, removeMode, onSnakeRemoved]);
 
   // Keep snakesRef in sync with snakes state
   useEffect(() => {
@@ -647,6 +692,7 @@ function DotCanvas({ onTap, tapPosition }) {
             setTimeout(() => {
               setSnakes(newSnakes);
               snakesRef.current = newSnakes;
+              initialSnakeCountRef.current = newSnakes.length;
               setProgress(null);
             }, 300);
             return; // Success - puzzle is guaranteed solvable
@@ -683,7 +729,11 @@ function DotCanvas({ onTap, tapPosition }) {
           setTimeout(() => {
             setSnakes(newSnakes);
             snakesRef.current = newSnakes;
+            initialSnakeCountRef.current = newSnakes.length;
             setProgress(null);
+            if (onGameStart) {
+              onGameStart();
+            }
           }, 300);
         } catch (error) {
           console.error('Error generating puzzle:', error);
@@ -714,7 +764,11 @@ function DotCanvas({ onTap, tapPosition }) {
           
           setSnakes(newSnakes);
           snakesRef.current = newSnakes;
+          initialSnakeCountRef.current = newSnakes.length;
           setProgress(null);
+          if (onGameStart) {
+            onGameStart();
+          }
         }
         };
         
@@ -767,6 +821,24 @@ function DotCanvas({ onTap, tapPosition }) {
 
   // Drawing is handled by the animation loop
 
+  // Expose reset method via ref
+  useImperativeHandle(ref, () => ({
+    reset: () => {
+      // Clear all intervals
+      animationIntervalsRef.current.forEach((interval) => {
+        clearInterval(interval);
+      });
+      animationIntervalsRef.current.clear();
+      animationStatesRef.current.clear();
+      
+      // Reset snakes and score tracking
+      setSnakes([]);
+      snakesRef.current = [];
+      initialSnakeCountRef.current = 0;
+      setProgress({ phase: 'generating', progress: 0, message: 'Initializing...' });
+    }
+  }));
+
   // Debug: log progress state
   if (progress) {
     console.log('Progress state:', progress);
@@ -794,7 +866,7 @@ function DotCanvas({ onTap, tapPosition }) {
       )}
     </div>
   );
-}
+});
 
 export default DotCanvas;
 
