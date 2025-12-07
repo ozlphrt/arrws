@@ -9,6 +9,8 @@ function App() {
   const [gameStarted, setGameStarted] = useState(false);
   const [removeMode, setRemoveMode] = useState(false);
   const [lives, setLives] = useState(3);
+  const [canUndo, setCanUndo] = useState(false);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
   const timeIntervalRef = useRef(null);
   const resetKeyRef = useRef(0);
   const dotCanvasRef = useRef(null);
@@ -41,6 +43,7 @@ function App() {
     setTime(0);
     setRemoveMode(false);
     setLives(3);
+    setShowCompletionModal(false);
     resetKeyRef.current += 1;
     
     // Clear timer
@@ -72,6 +75,30 @@ function App() {
     }
   }, [lives]);
 
+  const handleUndoStateChange = useCallback((undoAvailable) => {
+    setCanUndo(undoAvailable);
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    if (dotCanvasRef.current && dotCanvasRef.current.undo) {
+      dotCanvasRef.current.undo();
+    }
+  }, []);
+
+  const handleAllSnakesCleared = useCallback(() => {
+    setShowCompletionModal(true);
+    // Stop the timer
+    if (timeIntervalRef.current) {
+      clearInterval(timeIntervalRef.current);
+      timeIntervalRef.current = null;
+    }
+  }, []);
+
+  const handleNext = useCallback(() => {
+    setShowCompletionModal(false);
+    handleNewGame();
+  }, [handleNewGame]);
+
   useEffect(() => {
     return () => {
       if (timeIntervalRef.current) {
@@ -98,20 +125,24 @@ function App() {
           onGameStart={handleGameStart}
           removeMode={removeMode}
           onSnakeRemoved={handleSnakeRemoved}
+          onUndoStateChange={handleUndoStateChange}
+          onAllSnakesCleared={handleAllSnakesCleared}
         />
       </main>
       <footer className="footer">
         <div className="footer-content">
-          <h1 className="title">ARROWS</h1>
           <div className="footer-stats">
-            <div className="stat-item">
-              <span className="stat-label">Score</span>
-              <span className="stat-value">{score}</span>
-            </div>
             <div className="stat-item">
               <span className="stat-label">Time</span>
               <span className="stat-value">{formatTime(time)}</span>
             </div>
+            <button 
+              className={`undo-btn ${!canUndo ? 'disabled' : ''}`}
+              onClick={handleUndo}
+              disabled={!canUndo}
+            >
+              <span className="undo-icon">↶</span>
+            </button>
             <button 
               className={`remove-snake-btn ${removeMode ? 'active' : ''} ${lives === 0 ? 'disabled' : ''}`}
               onClick={handleToggleRemoveMode}
@@ -127,6 +158,17 @@ function App() {
           </div>
         </div>
       </footer>
+      {showCompletionModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2 className="modal-title">Level Complete!</h2>
+            <p className="modal-message">All snakes have been cleared.</p>
+            <button className="modal-next-btn" onClick={handleNext}>
+              Next
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
