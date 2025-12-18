@@ -6,6 +6,46 @@
   overflow: hidden;
 }
 
+.header {
+  background: var(--bg-tertiary);
+  padding: 4px var(--padding-lg);
+  box-shadow: var(--shadow-sm);
+  z-index: 10;
+}
+
+.header-content {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--margin-xl);
+  flex-wrap: nowrap;
+  max-width: 100%;
+}
+
+.header-stats {
+  display: flex;
+  gap: var(--margin-xl);
+  align-items: center;
+  flex-wrap: nowrap;
+  width: 100%;
+  justify-content: center;
+}
+
+.header-stats .stat-item {
+  background: transparent;
+  border: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  flex: 0 1 auto;
+  min-width: auto;
+  max-width: fit-content;
+  padding: 0 var(--padding-md);
+  align-items: center;
+  flex-direction: row;
+  gap: var(--margin-sm);
+  justify-content: center;
+}
+
 .footer {
   background: var(--bg-tertiary);
   padding: var(--padding-sm) var(--padding-lg);
@@ -15,11 +55,12 @@
 
 .footer-content {
   display: flex;
-  justify-content: space-between;
+  justify-content: space-evenly;
   align-items: center;
-  gap: var(--margin-xl);
+  gap: var(--margin-md);
   flex-wrap: nowrap;
   max-width: 100%;
+  width: 100%;
 }
 
 .title {
@@ -37,6 +78,8 @@
   gap: var(--margin-md);
   align-items: center;
   flex-wrap: nowrap;
+  width: 100%;
+  justify-content: space-evenly;
 }
 
 .stat-item {
@@ -46,10 +89,10 @@
   background: rgba(255, 255, 255, 0.25);
   border: 2px solid rgba(255, 255, 255, 0.4);
   border-radius: var(--radius-md);
-  padding: var(--padding-sm) var(--padding-md);
+  padding: var(--padding-sm) var(--padding-lg);
   backdrop-filter: blur(4px);
   min-height: 48px;
-  min-width: 60px;
+  min-width: 100px;
   box-sizing: border-box;
   justify-content: center;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
@@ -73,6 +116,14 @@
   line-height: 1.2;
 }
 
+.header-stats .stat-label {
+  font-size: 24px;
+}
+
+.header-stats .stat-value {
+  font-size: 48px;
+}
+
 .new-game-btn {
   background: var(--btn-accent);
   color: var(--text-primary);
@@ -87,7 +138,8 @@
   align-items: flex-start;
   justify-content: center;
   min-height: 48px;
-  min-width: 60px;
+  flex: 1;
+  max-width: 100%;
   box-sizing: border-box;
   box-shadow: var(--shadow-sm);
 }
@@ -121,7 +173,8 @@
   align-items: flex-start;
   justify-content: center;
   min-height: 48px;
-  min-width: 60px;
+  flex: 1;
+  max-width: 100%;
   box-sizing: border-box;
   backdrop-filter: blur(4px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
@@ -178,10 +231,12 @@
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
   justify-content: center;
   min-height: 48px;
-  min-width: 60px;
+  flex: 1;
+  max-width: 100%;
   box-sizing: border-box;
   backdrop-filter: blur(4px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
@@ -198,20 +253,31 @@
   cursor: not-allowed;
 }
 
-.undo-btn.disabled .undo-icon {
+.undo-btn.disabled .undo-label-top,
+.undo-btn.disabled .undo-label-bottom {
   opacity: 0.5;
 }
 
-.undo-icon {
-  font-size: 24px;
-  font-weight: bold;
+.undo-label-top {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
   line-height: 1;
-  color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
+  opacity: 0.9;
+}
+
+.undo-label-bottom {
+  font-size: 16px;
+  font-weight: bold;
+  line-height: 1.2;
+}
+
+.undo-icon {
+  width: 16px;
+  height: 16px;
+  display: inline-block;
+  vertical-align: middle;
 }
 
 .new-game-btn:hover {
@@ -223,6 +289,53 @@
 .new-game-btn:active {
   transform: translateY(0);
 }
+
+.restart-level-btn {
+  background: rgba(255, 255, 255, 0.25);
+  color: var(--text-primary);
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  padding: var(--padding-sm) var(--padding-md);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 48px;
+  flex: 1;
+  max-width: 100%;
+  box-sizing: border-box;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.restart-level-btn:hover {
+  background: rgba(255, 255, 255, 0.35);
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.restart-level-btn:active {
+  transform: translateY(0);
+}
+
+.restart-level-label-top {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+  line-height: 1;
+  opacity: 0.9;
+}
+
+.restart-level-label-bottom {
+  font-size: 16px;
+  font-weight: bold;
+  line-height: 1.2;
+}
+
 
 .main-content {
   flex: 1;
@@ -252,6 +365,30 @@
 }
 
 @media (max-width: 768px) {
+  .header {
+    padding: 3px var(--padding-md);
+  }
+
+  .header-content {
+    gap: var(--margin-md);
+  }
+
+  .header-stats {
+    gap: var(--margin-sm);
+  }
+
+  .header-stats .stat-item {
+    padding: var(--padding-xs) 0;
+  }
+
+  .header-stats .stat-label {
+    font-size: 20px;
+  }
+
+  .header-stats .stat-value {
+    font-size: 40px;
+  }
+
   .footer {
     padding: var(--padding-sm) var(--padding-md);
   }
@@ -270,9 +407,9 @@
   }
 
   .stat-item {
-    padding: var(--padding-xs) var(--padding-sm);
+    padding: var(--padding-xs) var(--padding-md);
     min-height: 44px;
-    min-width: 50px;
+    min-width: 80px;
   }
 
   .stat-value {
@@ -287,7 +424,8 @@
   .remove-snake-btn {
     padding: var(--padding-xs) var(--padding-sm);
     min-height: 44px;
-    min-width: 50px;
+    flex: 1;
+    max-width: 100%;
   }
 
   .remove-snake-label-top {
@@ -299,20 +437,48 @@
     font-size: 14px;
   }
 
+  .restart-level-btn {
+    padding: var(--padding-xs) var(--padding-sm);
+    min-height: 44px;
+    flex: 1;
+    max-width: 100%;
+  }
+
+  .restart-level-label-top {
+    font-size: 9px;
+    margin-bottom: 3px;
+  }
+
+  .restart-level-label-bottom {
+    font-size: 14px;
+  }
+
   .undo-btn {
     padding: var(--padding-xs) var(--padding-sm);
     min-height: 44px;
-    min-width: 50px;
+    flex: 1;
+    max-width: 100%;
+  }
+
+  .undo-label-top {
+    font-size: 9px;
+    margin-bottom: 3px;
+  }
+
+  .undo-label-bottom {
+    font-size: 14px;
   }
 
   .undo-icon {
-    font-size: 20px;
+    width: 14px;
+    height: 14px;
   }
 
   .new-game-btn {
     padding: var(--padding-xs) var(--padding-sm);
     min-height: 44px;
-    min-width: 50px;
+    flex: 1;
+    max-width: 100%;
   }
 
   .new-game-label-top {
@@ -335,6 +501,30 @@
 }
 
 @media (orientation: landscape) and (max-height: 500px) {
+  .header {
+    padding: 2px var(--padding-md);
+  }
+
+  .header-content {
+    gap: var(--margin-sm);
+  }
+
+  .header-stats {
+    gap: var(--margin-xs);
+  }
+
+  .header-stats .stat-item {
+    padding: var(--padding-xs) 0;
+  }
+
+  .header-stats .stat-label {
+    font-size: 18px;
+  }
+
+  .header-stats .stat-value {
+    font-size: 36px;
+  }
+
   .footer {
     padding: var(--padding-xs) var(--padding-md);
   }
@@ -354,7 +544,7 @@
   .stat-item {
     padding: var(--padding-xs) var(--padding-sm);
     min-height: 36px;
-    min-width: 45px;
+    min-width: 70px;
   }
 
   .stat-value {
@@ -369,7 +559,8 @@
   .remove-snake-btn {
     padding: var(--padding-xs) var(--padding-sm);
     min-height: 36px;
-    min-width: 45px;
+    flex: 1;
+    max-width: 100%;
   }
 
   .remove-snake-label-top {
@@ -381,20 +572,48 @@
     font-size: 12px;
   }
 
+  .restart-level-btn {
+    padding: var(--padding-xs) var(--padding-sm);
+    min-height: 36px;
+    flex: 1;
+    max-width: 100%;
+  }
+
+  .restart-level-label-top {
+    font-size: 8px;
+    margin-bottom: 2px;
+  }
+
+  .restart-level-label-bottom {
+    font-size: 12px;
+  }
+
   .undo-btn {
     padding: var(--padding-xs) var(--padding-sm);
     min-height: 36px;
-    min-width: 45px;
+    flex: 1;
+    max-width: 100%;
+  }
+
+  .undo-label-top {
+    font-size: 8px;
+    margin-bottom: 2px;
+  }
+
+  .undo-label-bottom {
+    font-size: 12px;
   }
 
   .undo-icon {
-    font-size: 18px;
+    width: 12px;
+    height: 12px;
   }
 
   .new-game-btn {
     padding: var(--padding-xs) var(--padding-sm);
     min-height: 36px;
-    min-width: 45px;
+    flex: 1;
+    max-width: 100%;
   }
 
   .new-game-label-top {

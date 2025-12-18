@@ -33,8 +33,14 @@ export class Snake {
   }
 
   generateColor() {
-    // All snakes are red
-    return '#f65e3b'; // Red-orange
+    // Get snake color from CSS variable, fallback to default
+    if (typeof window !== 'undefined') {
+      const snakeColor = getComputedStyle(document.documentElement).getPropertyValue('--game-snake-color').trim();
+      if (snakeColor) {
+        return snakeColor;
+      }
+    }
+    return '#e74c3c'; // Red default
   }
 
   getHead() {
@@ -463,6 +469,56 @@ export class Snake {
 
   getOccupiedPositions() {
     return this.gridPositions.map(pos => `${pos.row},${pos.col}`);
+  }
+
+  // Check if this snake can move in any direction
+  canMoveInAnyDirection(rows, cols, allSnakes) {
+    const head = this.getHead();
+    const allDirections = [DIRECTIONS.UP, DIRECTIONS.DOWN, DIRECTIONS.LEFT, DIRECTIONS.RIGHT];
+    
+    // Create set of occupied positions (excluding own tail)
+    const occupiedPositions = new Set();
+    allSnakes.forEach(snake => {
+      const tail = snake.getTail();
+      snake.gridPositions.forEach((pos, index) => {
+        // Allow moving to own tail
+        if (snake === this && index === snake.gridPositions.length - 1) {
+          return;
+        }
+        // Only track on-screen positions for collision
+        if (pos.row >= 0 && pos.row < rows && pos.col >= 0 && pos.col < cols) {
+          occupiedPositions.add(`${pos.row},${pos.col}`);
+        }
+      });
+    });
+
+    // Try each direction
+    for (const dir of allDirections) {
+      const nextRow = head.row + dir.row;
+      const nextCol = head.col + dir.col;
+      
+      // Check if next position is occupied (only check if on-screen)
+      if (nextRow >= 0 && nextRow < rows && nextCol >= 0 && nextCol < cols) {
+        const nextPos = `${nextRow},${nextCol}`;
+        if (occupiedPositions.has(nextPos)) {
+          continue; // This direction is blocked
+        }
+      }
+      
+      // Check if next position is the tail (allowed, since tail moves)
+      const tail = this.getTail();
+      if (nextRow === tail.row && nextCol === tail.col) {
+        return true; // Can move to tail
+      }
+      
+      // Allow movement even off-screen (snake will continue until fully off-screen)
+      // But for "no moves" detection, we only care about on-screen moves
+      if (nextRow >= 0 && nextRow < rows && nextCol >= 0 && nextCol < cols) {
+        return true; // Can move in this direction
+      }
+    }
+    
+    return false; // No valid moves found
   }
 }
 

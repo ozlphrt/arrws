@@ -49,6 +49,11 @@
   /* Transitions */
   --transition-fast: 0.15s ease-out;
   --transition-normal: 0.2s ease;
+  
+  /* Game Colors */
+  --game-snake-color: #e74c3c; /* Red tone */
+  --game-dot-fill: #776e65;
+  --game-dot-stroke: rgba(120, 110, 100, 0.3);
 }
 
 * {

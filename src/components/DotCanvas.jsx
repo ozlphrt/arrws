@@ -4,7 +4,7 @@ import { Snake, generateRandomSnake, isPuzzleSolvable } from '../utils/snake';
 const ROWS = 36;
 const COLS = 18;
 
-const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpdate, onGameStart, removeMode = false, onSnakeRemoved, onUndoStateChange, onAllSnakesCleared, level = 1 }, ref) {
+const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpdate, onGameStart, removeMode = false, onSnakeRemoved, onUndoStateChange, onAllSnakesCleared, onNoMoves, onSnakesChange, level = 1, initialSnakeState = null }, ref) {
   const canvasRef = useRef(null);
   const dotsRef = useRef([]);
   const animationFrameRef = useRef(null);
@@ -351,6 +351,20 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
     return bestSnake;
   }, [gridToCanvas, distanceToLineSegment]);
 
+  // Check if any snake can move
+  const checkNoMoves = useCallback((snakesList) => {
+    if (snakesList.length === 0) return false;
+    
+    // Check if any snake can move in any direction
+    for (const snake of snakesList) {
+      if (snake.canMoveInAnyDirection(ROWS, COLS, snakesList)) {
+        return false; // At least one snake can move
+      }
+    }
+    
+    return true; // No snake can move
+  }, []);
+
   const startSnakeMovement = useCallback((snakeIndex) => {
     // Check if this snake is already moving
     // Note: Multiple snakes can move simultaneously - each has its own interval
@@ -461,6 +475,27 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
           
           // Remove the snake and update score
           const updated = prevSnakes.filter((_, idx) => idx !== snakeIndex);
+          
+          // If this was the last snake, mark completion immediately and call it synchronously
+          if (updated.length === 0 && gameStartCalledRef.current && initialSnakeCountRef.current > 0 && !completionModalShownRef.current) {
+            completionModalShownRef.current = true;
+            // Stop all movements immediately
+            animationIntervalsRef.current.forEach((interval) => {
+              clearInterval(interval);
+            });
+            animationIntervalsRef.current.clear();
+            animationStatesRef.current.clear();
+            // Call completion handler immediately (synchronously) to prevent race condition
+            if (onAllSnakesCleared) {
+              // Use requestAnimationFrame to ensure it runs in the next frame, but before any setTimeout
+              requestAnimationFrame(() => {
+                if (completionModalShownRef.current && onAllSnakesCleared) {
+                  onAllSnakesCleared();
+                }
+              });
+            }
+          }
+          
           if (onScoreUpdate && initialSnakeCountRef.current > 0) {
             const removed = initialSnakeCountRef.current - updated.length;
             pendingScoreUpdateRef.current = removed; // Queue for after render
@@ -499,6 +534,27 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
           
           // Remove the snake and update score
           const updated = prevSnakes.filter((_, idx) => idx !== snakeIndex);
+          
+          // If this was the last snake, mark completion immediately and call it synchronously
+          if (updated.length === 0 && gameStartCalledRef.current && initialSnakeCountRef.current > 0 && !completionModalShownRef.current) {
+            completionModalShownRef.current = true;
+            // Stop all movements immediately
+            animationIntervalsRef.current.forEach((interval) => {
+              clearInterval(interval);
+            });
+            animationIntervalsRef.current.clear();
+            animationStatesRef.current.clear();
+            // Call completion handler immediately (synchronously) to prevent race condition
+            if (onAllSnakesCleared) {
+              // Use requestAnimationFrame to ensure it runs in the next frame, but before any setTimeout
+              requestAnimationFrame(() => {
+                if (completionModalShownRef.current && onAllSnakesCleared) {
+                  onAllSnakesCleared();
+                }
+              });
+            }
+          }
+          
           if (onScoreUpdate && initialSnakeCountRef.current > 0) {
             const removed = initialSnakeCountRef.current - updated.length;
             pendingScoreUpdateRef.current = removed; // Queue for after render
@@ -517,6 +573,40 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
             animationIntervalsRef.current.delete(snakeIndex);
           }
           animationStatesRef.current.delete(snakeIndex);
+          
+          // Check if no moves are possible after this snake stopped
+          // BUT: Only check if NO snakes are currently moving (wait for all to finish)
+          // AND: Don't trigger "no moves" if all snakes are cleared (completion takes priority)
+          if (prevSnakes.length > 0 && 
+              animationIntervalsRef.current.size === 0 && // CRITICAL: Only check when NO snakes are moving
+              checkNoMoves(prevSnakes) && 
+              onNoMoves && 
+              gameStartCalledRef.current && 
+              !completionModalShownRef.current) {
+            // Use requestAnimationFrame + setTimeout to ensure completion detection runs first
+            requestAnimationFrame(() => {
+              setTimeout(() => {
+                // Re-check: snakes still exist, no active movements, and no completion
+                if (snakesRef.current.length > 0 && 
+                    animationIntervalsRef.current.size === 0 &&
+                    !completionModalShownRef.current && 
+                    checkNoMoves(snakesRef.current)) {
+                  // Stop all snake movements (should already be stopped, but be safe)
+                  animationIntervalsRef.current.forEach((interval) => {
+                    clearInterval(interval);
+                  });
+                  animationIntervalsRef.current.clear();
+                  animationStatesRef.current.clear();
+                  
+                  // Only call onNoMoves if completion modal hasn't been shown
+                  if (!completionModalShownRef.current) {
+                    onNoMoves();
+                  }
+                }
+              }, 200); // Longer delay to ensure all snakes finish moving
+            });
+          }
+          
           return prevSnakes;
         }
         
@@ -524,13 +614,47 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
         const updatedSnakes = [...prevSnakes];
         updatedSnakes[snakeIndex] = snakeCopy;
         snakesRef.current = updatedSnakes; // Keep ref in sync
+        
+        // Check if no moves are possible after this update
+        // BUT: Only check if NO snakes are currently moving (wait for all to finish)
+        // AND: Don't trigger "no moves" if all snakes are cleared (completion takes priority)
+        if (updatedSnakes.length > 0 && 
+            animationIntervalsRef.current.size === 0 && // CRITICAL: Only check when NO snakes are moving
+            checkNoMoves(updatedSnakes) && 
+            onNoMoves && 
+            gameStartCalledRef.current && 
+            !completionModalShownRef.current) {
+          // Use requestAnimationFrame + setTimeout to ensure completion detection runs first
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              // Re-check: snakes still exist, no active movements, and no completion
+              if (snakesRef.current.length > 0 && 
+                  animationIntervalsRef.current.size === 0 &&
+                  !completionModalShownRef.current && 
+                  checkNoMoves(snakesRef.current)) {
+                // Stop all snake movements (should already be stopped, but be safe)
+                animationIntervalsRef.current.forEach((interval) => {
+                  clearInterval(interval);
+                });
+                animationIntervalsRef.current.clear();
+                animationStatesRef.current.clear();
+                
+                // Only call onNoMoves if completion modal hasn't been shown
+                if (!completionModalShownRef.current) {
+                  onNoMoves();
+                }
+              }
+            }, 200); // Longer delay to ensure all snakes finish moving
+          });
+        }
+        
         return updatedSnakes;
       });
     }, 30); // Move every 30ms for faster, smoother movement
     
     // Store the interval ID for this snake
     animationIntervalsRef.current.set(snakeIndex, intervalId);
-  }, []);
+  }, [checkNoMoves, onNoMoves]);
 
   // Handle mouse/touch hover and interaction
   useEffect(() => {
@@ -593,19 +717,56 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
         }
         
         // Normal mode: start snake movement
-        // Save state before starting movement
-        setSnakes(prevSnakes => {
-          if (snakeIndex < prevSnakes.length) {
-            // Only save if snake is not already moving
-            if (!animationIntervalsRef.current.has(snakeIndex)) {
-              saveStateToHistory(prevSnakes);
-            }
-            
-            setTimeout(() => {
-              startSnakeMovement(snakeIndex);
-            }, 0);
+        // Check if this snake is already moving - if so, do nothing
+        if (animationIntervalsRef.current.has(snakeIndex)) {
+          return; // Already moving, ignore click
+        }
+        
+        // Save state before starting movement (only once, not per snake)
+        // Use a ref to track if we've saved for this batch of movements
+        const currentSnakes = snakesRef.current;
+        if (currentSnakes.length > 0 && !animationIntervalsRef.current.has(snakeIndex)) {
+          // Save state only if no other snakes are moving (first snake in batch)
+          const hasAnyMoving = Array.from(animationIntervalsRef.current.keys()).length > 0;
+          if (!hasAnyMoving) {
+            saveStateToHistory(currentSnakes);
           }
-          return prevSnakes;
+        }
+        
+        // Start movement immediately (allows multiple snakes to start simultaneously)
+        startSnakeMovement(snakeIndex);
+        
+        // Check if no moves are possible after starting movement
+        // BUT: Only check if NO snakes are currently moving (wait for all to finish)
+        // AND: Don't trigger "no moves" if all snakes are cleared (completion takes priority)
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            const currentSnakes = snakesRef.current;
+            // CRITICAL: Only check when NO snakes are moving and snakes still exist
+            if (currentSnakes.length > 0 && 
+                animationIntervalsRef.current.size === 0 && // Wait for all movements to finish
+                checkNoMoves(currentSnakes) && 
+                onNoMoves && 
+                gameStartCalledRef.current && 
+                !completionModalShownRef.current) {
+              // Double-check that completion modal hasn't been shown and no movements
+              if (!completionModalShownRef.current && 
+                  currentSnakes.length > 0 && 
+                  animationIntervalsRef.current.size === 0) {
+                // Stop all snake movements (should already be stopped, but be safe)
+                animationIntervalsRef.current.forEach((interval) => {
+                  clearInterval(interval);
+                });
+                animationIntervalsRef.current.clear();
+                animationStatesRef.current.clear();
+                
+                // Only call onNoMoves if completion modal hasn't been shown
+                if (!completionModalShownRef.current) {
+                  onNoMoves();
+                }
+              }
+            }
+          }, 300); // Longer delay to ensure all snakes finish moving and completion runs first
         });
       }
 
@@ -617,12 +778,16 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
 
     const handleTouch = (e) => {
       e.preventDefault();
-      const touch = e.touches[0] || e.changedTouches[0];
-      const clientX = touch.clientX;
-      const clientY = touch.clientY;
-
-      // Handle tap
-      handleClick(clientX, clientY);
+      
+      // Support multi-touch - handle all touches
+      const touches = e.touches.length > 0 ? Array.from(e.touches) : Array.from(e.changedTouches);
+      
+      touches.forEach(touch => {
+        const clientX = touch.clientX;
+        const clientY = touch.clientY;
+        // Handle each touch point (allows multiple snakes to start simultaneously)
+        handleClick(clientX, clientY);
+      });
     };
 
     const handleMouseClick = (e) => {
@@ -636,25 +801,39 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
       canvas.removeEventListener('click', handleMouseClick);
       canvas.removeEventListener('touchstart', handleTouch);
     };
-  }, [findSnakeAtPosition, startSnakeMovement, onTap, removeMode, onSnakeRemoved, saveStateToHistory]);
+  }, [findSnakeAtPosition, startSnakeMovement, onTap, removeMode, onSnakeRemoved, saveStateToHistory, checkNoMoves, onNoMoves]);
 
   // Keep snakesRef in sync with snakes state
   useEffect(() => {
     snakesRef.current = snakes;
-  }, [snakes]);
+    // Notify parent when snakes change (for state saving)
+    if (onSnakesChange) {
+      onSnakesChange();
+    }
+  }, [snakes, onSnakesChange]);
 
-  // Detect when all snakes are cleared
+  // Detect when all snakes are cleared (backup detection via useEffect)
+  // NOTE: Primary detection happens immediately when snake is removed (in collision/off-screen handlers)
+  // This useEffect is a backup in case the immediate detection didn't fire
   useEffect(() => {
     // Only trigger if game has started and all snakes are cleared, and modal hasn't been shown yet
     if (gameStartCalledRef.current && snakes.length === 0 && initialSnakeCountRef.current > 0 && !completionModalShownRef.current && onAllSnakesCleared) {
       completionModalShownRef.current = true;
       // Clear progress to prevent "Initializing..." from showing
       setProgress(null);
-      // Small delay to ensure state is settled
-      const timeoutId = setTimeout(() => {
-        onAllSnakesCleared();
-      }, 100);
-      return () => clearTimeout(timeoutId);
+      // Stop all snake movements immediately to prevent any further checks
+      animationIntervalsRef.current.forEach((interval) => {
+        clearInterval(interval);
+      });
+      animationIntervalsRef.current.clear();
+      animationStatesRef.current.clear();
+      // Call immediately using requestAnimationFrame to ensure it runs before any setTimeout
+      requestAnimationFrame(() => {
+        // Double-check that completion modal flag is still set
+        if (completionModalShownRef.current && onAllSnakesCleared) {
+          onAllSnakesCleared();
+        }
+      });
     }
   }, [snakes.length, onAllSnakesCleared]);
 
@@ -838,6 +1017,16 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
             }
           }
           
+          // Validate puzzle is solvable
+          if (newSnakes.length > 0) {
+            setProgress({ 
+              phase: 'validating', 
+              progress: 90, 
+              message: `Validating puzzle... (${newSnakes.length} snakes)` 
+            });
+            
+            await new Promise(resolve => setTimeout(resolve, 50));
+            
           // No validation needed - reverse generation guarantees solvability!
           if (newSnakes.length > 0) {
             setProgress({ 
@@ -854,9 +1043,10 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
             return; // Success - puzzle is guaranteed solvable
           }
           }
+          }
           
           // If we couldn't generate a solvable puzzle after max attempts,
-          // still set the snakes (fallback - should be rare)
+          // try one final attempt with validation
           setProgress({ phase: 'generating', progress: 0, message: 'Final attempt...' });
           const occupiedPositions = new Set();
           const newSnakes = [];
@@ -898,8 +1088,8 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
           }, 500);
         } catch (error) {
           console.error('Error generating puzzle:', error);
-          setProgress({ phase: 'error', progress: 0, message: 'Error generating puzzle. Please refresh.' });
-          // Fallback: generate without validation
+          setProgress({ phase: 'error', progress: 0, message: 'Error generating puzzle. Retrying...' });
+          // Fallback: generate with validation
           const occupiedPositions = new Set();
           const newSnakes = [];
           const totalDots = ROWS * COLS;
@@ -1050,7 +1240,56 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
       
       return true; // Undo successful
     },
-    canUndo: () => historyRef.current.length > 0
+    canUndo: () => historyRef.current.length > 0,
+    updateColors: () => {
+      // Update all existing snake colors from CSS variable
+      const newColor = getComputedStyle(document.documentElement).getPropertyValue('--game-snake-color').trim() || '#e74c3c';
+      setSnakes(prevSnakes => {
+        const updatedSnakes = prevSnakes.map(snake => {
+          const updatedSnake = new Snake([...snake.gridPositions], newColor);
+          updatedSnake.direction = snake.direction;
+          return updatedSnake;
+        });
+        snakesRef.current = updatedSnakes;
+        return updatedSnakes;
+      });
+    },
+    getState: () => {
+      // Return serializable state
+      if (snakes.length === 0) return null;
+      return {
+        snakes: snakes.map(snake => ({
+          gridPositions: snake.gridPositions.map(pos => ({ ...pos })),
+          direction: snake.direction,
+          color: snake.color
+        })),
+        initialSnakeCount: initialSnakeCountRef.current,
+        gameStartCalled: gameStartCalledRef.current
+      };
+    },
+    loadState: (state) => {
+      if (!state || !state.snakes || state.snakes.length === 0) return;
+      
+      // Restore snakes
+      const restoredSnakes = state.snakes.map(snakeData => {
+        const snake = new Snake(snakeData.gridPositions, snakeData.color);
+        snake.direction = snakeData.direction;
+        return snake;
+      });
+      
+      setSnakes(restoredSnakes);
+      snakesRef.current = restoredSnakes;
+      initialSnakeCountRef.current = state.initialSnakeCount || restoredSnakes.length;
+      gameStartCalledRef.current = state.gameStartCalled || false;
+      
+      // Clear progress
+      setProgress(null);
+      
+      // Update undo state
+      if (onUndoStateChange) {
+        pendingUndoStateChangeRef.current = historyRef.current.length > 0;
+      }
+    }
   }));
 
   // Debug: log progress state
