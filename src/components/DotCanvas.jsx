@@ -351,6 +351,18 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
     return bestSnake;
   }, [gridToCanvas, distanceToLineSegment]);
 
+  // Calculate movement speed based on snake length
+  // Longer snakes move faster: base speed 30ms, decreases by 0.4ms per segment
+  // Formula: interval = max(15, 30 - (length - 3) * 0.4)
+  // This gives: 3 segments = 30ms, 10 segments = 27ms, 20 segments = 23ms, 40 segments = 15ms
+  const getSnakeSpeed = useCallback((snakeLength) => {
+    const baseInterval = 30; // Base speed for shortest snakes
+    const minInterval = 15; // Minimum speed (fastest)
+    const speedMultiplier = 0.4; // How much faster per additional segment
+    const baseLength = 3; // Reference length
+    return Math.max(minInterval, baseInterval - (snakeLength - baseLength) * speedMultiplier);
+  }, []);
+
   // Check if any snake can move
   const checkNoMoves = useCallback((snakesList) => {
     if (snakesList.length === 0) return false;
@@ -372,12 +384,23 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
       return; // Already moving, don't start again
     }
     
+    // Get current snake length for speed calculation from ref (most up-to-date)
+    const currentSnakes = snakesRef.current;
+    if (snakeIndex >= currentSnakes.length || !currentSnakes[snakeIndex]) {
+      return; // Snake doesn't exist
+    }
+    
+    const snakeLength = currentSnakes[snakeIndex].gridPositions.length;
+    const movementInterval = getSnakeSpeed(snakeLength);
+    
     // Start continuous movement for this specific snake
-    // Each snake gets its own independent interval, allowing multiple snakes to move at once
-    // Use faster interval (80ms instead of 150ms) for smoother movement
+    // Each snake gets its own independent interval with speed based on length
+    // CRITICAL: Capture snakeIndex in closure to ensure each interval is independent
+    // Each snake's interval operates completely independently and only updates its own snake
     const intervalId = setInterval(() => {
       setSnakes(prevSnakes => {
-        // Check if snake still exists and is valid
+        // Check if snake still exists - trust prevSnakes (React's batched state)
+        // React batches updates, so prevSnakes will include all pending updates from other snakes
         if (snakeIndex >= prevSnakes.length || !prevSnakes[snakeIndex]) {
           // Snake was removed, clean up interval
           const interval = animationIntervalsRef.current.get(snakeIndex);
@@ -386,9 +409,11 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
             animationIntervalsRef.current.delete(snakeIndex);
           }
           animationStatesRef.current.delete(snakeIndex);
-          return prevSnakes;
+          return prevSnakes; // Return unchanged state
         }
         
+        // Get the snake from prevSnakes (React's latest batched state)
+        // This includes any updates from other snakes' intervals that were batched
         const activeSnake = prevSnakes[snakeIndex];
         
         // Store start position for animation
@@ -444,12 +469,14 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
               }
               
               const endHead = snakeCopy.getHead();
-              // Start animation
+              // Calculate animation duration based on current snake length (faster snakes = shorter duration)
+              const currentSnakeLength = snakeCopy.gridPositions.length;
+              const currentMovementInterval = getSnakeSpeed(currentSnakeLength);
               animationStatesRef.current.set(snakeIndex, {
                 startPos: startHead,
                 endPos: endHead,
                 startTime: Date.now(),
-                duration: 30 // Match interval duration for smooth transition
+                duration: currentMovementInterval // Match interval duration for smooth transition
               });
               const updatedSnakes = [...prevSnakes];
               updatedSnakes[snakeIndex] = snakeCopy;
@@ -513,12 +540,15 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
           }
           
           const endHead = snakeCopy.getHead();
+          // Calculate animation duration based on current snake length (faster snakes = shorter duration)
+          const currentSnakeLength = snakeCopy.gridPositions.length;
+          const currentMovementInterval = getSnakeSpeed(currentSnakeLength);
           // Start animation
           animationStatesRef.current.set(snakeIndex, {
             startPos: startHead,
             endPos: endHead,
             startTime: Date.now(),
-            duration: 30 // Match interval duration for smooth transition
+            duration: currentMovementInterval // Match interval duration for smooth transition
           });
         }
         
@@ -610,10 +640,19 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
           return prevSnakes;
         }
         
-        // Update the snake
-        const updatedSnakes = [...prevSnakes];
-        updatedSnakes[snakeIndex] = snakeCopy;
-        snakesRef.current = updatedSnakes; // Keep ref in sync
+        // Update the snake - preserve all other snakes exactly as they are
+        // This ensures that other snakes' movements are not affected by this snake's update
+        // CRITICAL: Always create a new array to trigger React re-render, but preserve other snakes
+        const updatedSnakes = prevSnakes.map((s, idx) => {
+          if (idx === snakeIndex) {
+            return snakeCopy; // Update this snake
+          }
+          // Preserve other snakes exactly as they are - don't recreate them
+          // This allows multiple snakes to update simultaneously without interfering
+          return s;
+        });
+        // Update ref immediately so other intervals can see the latest state
+        snakesRef.current = updatedSnakes;
         
         // Check if no moves are possible after this update
         // BUT: Only check if NO snakes are currently moving (wait for all to finish)
@@ -650,11 +689,11 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
         
         return updatedSnakes;
       });
-    }, 30); // Move every 30ms for faster, smoother movement
+    }, movementInterval); // Speed varies based on snake length (longer = faster)
     
     // Store the interval ID for this snake
     animationIntervalsRef.current.set(snakeIndex, intervalId);
-  }, [checkNoMoves, onNoMoves]);
+  }, [checkNoMoves, onNoMoves, getSnakeSpeed]);
 
   // Handle mouse/touch hover and interaction
   useEffect(() => {
@@ -717,23 +756,27 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
         }
         
         // Normal mode: start snake movement
-        // Check if this snake is already moving - if so, do nothing
+        // Check if this snake is already moving - if so, do nothing (let it continue)
+        // This allows users to tap multiple snakes quickly without interrupting their movement
         if (animationIntervalsRef.current.has(snakeIndex)) {
-          return; // Already moving, ignore click
+          return; // Already moving, ignore click - snake will continue its movement
         }
         
         // Save state before starting movement (only once, not per snake)
-        // Use a ref to track if we've saved for this batch of movements
+        // This ensures undo works correctly even when multiple snakes are tapped rapidly
         const currentSnakes = snakesRef.current;
-        if (currentSnakes.length > 0 && !animationIntervalsRef.current.has(snakeIndex)) {
-          // Save state only if no other snakes are moving (first snake in batch)
-          const hasAnyMoving = Array.from(animationIntervalsRef.current.keys()).length > 0;
+        if (currentSnakes.length > 0) {
+          // Save state only if no other snakes are currently moving (first snake in batch)
+          // This allows rapid tapping of multiple snakes - each will start moving independently
+          const hasAnyMoving = animationIntervalsRef.current.size > 0;
           if (!hasAnyMoving) {
             saveStateToHistory(currentSnakes);
           }
         }
         
         // Start movement immediately (allows multiple snakes to start simultaneously)
+        // Each snake gets its own independent interval that operates completely independently
+        // This enables speedy gameplay where users can tap snakes one after another rapidly
         startSnakeMovement(snakeIndex);
         
         // Check if no moves are possible after starting movement

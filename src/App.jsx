@@ -14,6 +14,7 @@ function App() {
   const [canUndo, setCanUndo] = useState(false);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [showGameOverModal, setShowGameOverModal] = useState(false);
+  const [showNewGameConfirmModal, setShowNewGameConfirmModal] = useState(false);
   const [level, setLevel] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const timeIntervalRef = useRef(null);
@@ -81,7 +82,12 @@ function App() {
     }, 1000);
   }, []);
 
-  const handleNewGame = useCallback(() => {
+  const handleNewGameClick = useCallback(() => {
+    // Show confirmation modal
+    setShowNewGameConfirmModal(true);
+  }, []);
+
+  const handleNewGameConfirm = useCallback(() => {
     // Reset completion detection flag
     completionDetectedRef.current = false;
     // Reset game state
@@ -92,6 +98,7 @@ function App() {
     setLives(3);
     setShowCompletionModal(false);
     setShowGameOverModal(false);
+    setShowNewGameConfirmModal(false);
     setLevel(1);
     resetKeyRef.current += 1;
     
@@ -108,6 +115,10 @@ function App() {
     if (dotCanvasRef.current) {
       dotCanvasRef.current.reset();
     }
+  }, []);
+
+  const handleNewGameCancel = useCallback(() => {
+    setShowNewGameConfirmModal(false);
   }, []);
 
   const handleRestartLevel = useCallback(() => {
@@ -389,13 +400,11 @@ function App() {
               onClick={handleUndo}
               disabled={!canUndo}
             >
-              <span className="undo-label-top">UNDO</span>
-              <span className="undo-label-bottom">
-                <svg className="undo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 7v6h6"/>
-                  <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/>
-                </svg>
-              </span>
+              <svg className="undo-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M9 14l-5-5 5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                <path d="M4 9h11a4 4 0 0 1 4 4v0a4 4 0 0 1-4 4H4" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+              </svg>
+              <span className="undo-label-bottom"></span>
             </button>
             <button 
               className={`remove-snake-btn ${removeMode ? 'active' : ''} ${lives === 0 ? 'disabled' : ''}`}
@@ -409,7 +418,7 @@ function App() {
               <span className="restart-level-label-top">RESTART</span>
               <span className="restart-level-label-bottom">Level</span>
             </button>
-            <button className="new-game-btn" onClick={handleNewGame}>
+            <button className="new-game-btn" onClick={handleNewGameClick}>
               <span className="new-game-label-top">NEW</span>
               <span className="new-game-label-bottom">Game</span>
             </button>
@@ -432,9 +441,25 @@ function App() {
           <div className="modal-content">
             <h2 className="modal-title">Game Over</h2>
             <p className="modal-message">No more moves are possible.</p>
-            <button className="modal-next-btn" onClick={handleNewGame}>
+            <button className="modal-next-btn" onClick={handleNewGameClick}>
               New Game
             </button>
+          </div>
+        </div>
+      )}
+      {showNewGameConfirmModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2 className="modal-title">Start New Game?</h2>
+            <p className="modal-message"><strong>All your progress will be lost and you'll start back at level 1.</strong></p>
+            <div className="modal-buttons">
+              <button className="modal-cancel-btn" onClick={handleNewGameCancel}>
+                Cancel
+              </button>
+              <button className="modal-confirm-btn" onClick={handleNewGameConfirm}>
+                New Game
+              </button>
+            </div>
           </div>
         </div>
       )}
