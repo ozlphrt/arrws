@@ -35,9 +35,10 @@ export class Snake {
   generateColor() {
     // Get snake color from CSS variable, fallback to default
     if (typeof window !== 'undefined') {
-      const snakeColor = getComputedStyle(document.documentElement).getPropertyValue('--game-snake-color').trim();
-      if (snakeColor) {
-        return snakeColor;
+      const root = document.documentElement;
+      let snakeColor = getComputedStyle(root).getPropertyValue('--game-snake-color');
+      if (snakeColor && snakeColor.trim() !== '') {
+        return snakeColor.trim();
       }
     }
     return '#e74c3c'; // Red default

@@ -10,6 +10,7 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
   const animationFrameRef = useRef(null);
   const animationIntervalsRef = useRef(new Map()); // Map of snake index to interval ID
   const animationStatesRef = useRef(new Map()); // Map of snake index to { startPos, endPos, startTime, duration }
+  const particlesRef = useRef([]); // Array of particle objects for visual effects
   const [snakes, setSnakes] = useState([]);
   const snakesRef = useRef([]); // Keep ref in sync for accurate detection
   const gridMapRef = useRef(new Map()); // Maps {row, col} to {x, y}
@@ -134,6 +135,16 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
     return 1 - Math.pow(1 - t, 3);
   }, []);
 
+  // Helper function to convert hex to RGB
+  const hexToRgb = useCallback((hex) => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+      r: parseInt(result[1], 16),
+      g: parseInt(result[2], 16),
+      b: parseInt(result[3], 16)
+    } : null;
+  }, []);
+
   const drawSnake = useCallback((ctx, snake, snakeIndex) => {
     if (snake.gridPositions.length === 0) return;
 
@@ -180,6 +191,9 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
     ctx.lineWidth = lineWidth;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
+    // Enable smooth path rendering with anti-aliasing
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
 
     if (snakeBody.length === 1) {
       // Single dot
@@ -226,6 +240,50 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
     ctx.restore();
   }, [gridToCanvas, easeOutCubic]);
 
+  // Create particles when snake is removed
+  const createParticles = useCallback((x, y, color) => {
+    const particleCount = 12;
+    const particles = [];
+    for (let i = 0; i < particleCount; i++) {
+      const angle = (Math.PI * 2 * i) / particleCount;
+      const speed = 2 + Math.random() * 3;
+      particles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 1.0,
+        decay: 0.02 + Math.random() * 0.02,
+        size: 3 + Math.random() * 4,
+        color: color || '#e74c3c'
+      });
+    }
+    particlesRef.current.push(...particles);
+  }, []);
+
+  // Update and draw particles
+  const updateParticles = useCallback((ctx) => {
+    particlesRef.current = particlesRef.current.filter(particle => {
+      particle.x += particle.vx;
+      particle.y += particle.vy;
+      particle.vy += 0.15; // Gravity
+      particle.life -= particle.decay;
+      particle.size *= 0.98;
+      
+      if (particle.life > 0 && particle.size > 0.5) {
+        ctx.save();
+        ctx.globalAlpha = particle.life;
+        ctx.fillStyle = particle.color;
+        ctx.beginPath();
+        ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+        return true;
+      }
+      return false;
+    });
+  }, []);
+
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -236,7 +294,37 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
       const dpr = window.devicePixelRatio || 1;
       const displayWidth = canvas.width / dpr;
       const displayHeight = canvas.height / dpr;
-      ctx.clearRect(0, 0, displayWidth, displayHeight);
+      // Fill canvas with background color from CSS variable
+      // Check if dark mode is active and use appropriate color
+      const root = document.documentElement;
+      const isDarkMode = root.classList.contains('dark-mode');
+      
+      let bgColor;
+      if (isDarkMode) {
+        // Use dark color for dark mode
+        bgColor = '#2d2d2d';
+      } else {
+        // Get primary background and make canvas slightly lighter
+        let primaryBg = getComputedStyle(root).getPropertyValue('--bg-primary');
+        if (!primaryBg || primaryBg.trim() === '') {
+          primaryBg = '#9a8a76'; // Fallback
+        } else {
+          primaryBg = primaryBg.trim();
+        }
+        
+        // Convert hex to RGB and lighten for canvas
+        const rgb = hexToRgb(primaryBg);
+        if (rgb) {
+          // Lighten by adding to RGB values (but keep it darker than white)
+          const lightenAmount = 40;
+          bgColor = `rgb(${Math.min(255, rgb.r + lightenAmount)}, ${Math.min(255, rgb.g + lightenAmount)}, ${Math.min(255, rgb.b + lightenAmount)})`;
+        } else {
+          // Fallback to a light beige (not white)
+          bgColor = '#e8e0d8';
+        }
+      }
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, displayWidth, displayHeight);
       return;
     }
 
@@ -245,15 +333,68 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
     const displayWidth = canvas.width / dpr;
     const displayHeight = canvas.height / dpr;
 
-    ctx.clearRect(0, 0, displayWidth, displayHeight);
+    // Fill canvas with background color - slightly lighter than main background
+    // Check if dark mode is active and use appropriate color
+    const root = document.documentElement;
+    const isDarkMode = root.classList.contains('dark-mode');
+    
+    let bgColor;
+    if (isDarkMode) {
+      // Use dark color for dark mode
+      bgColor = '#2d2d2d';
+    } else {
+      // Get primary background and make canvas slightly lighter
+      let primaryBg = getComputedStyle(root).getPropertyValue('--bg-primary');
+      if (!primaryBg || primaryBg.trim() === '') {
+        primaryBg = '#9a8a76'; // Fallback
+      } else {
+        primaryBg = primaryBg.trim();
+      }
+      
+      // Convert hex to RGB and lighten for canvas
+      const hexToRgb = (hex) => {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+          r: parseInt(result[1], 16),
+          g: parseInt(result[2], 16),
+          b: parseInt(result[3], 16)
+        } : null;
+      };
+      
+      const rgb = hexToRgb(primaryBg);
+      if (rgb) {
+        // Lighten by adding to RGB values (but keep it darker than white)
+        const lightenAmount = 40;
+        bgColor = `rgb(${Math.min(255, rgb.r + lightenAmount)}, ${Math.min(255, rgb.g + lightenAmount)}, ${Math.min(255, rgb.b + lightenAmount)})`;
+      } else {
+        // Fallback to a light beige (not white)
+        bgColor = '#e8e0d8';
+      }
+    }
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, displayWidth, displayHeight);
 
-    // Draw dots
+    // Draw dots - same color as base background (--bg-primary)
+    let dotColor;
+    if (isDarkMode) {
+      // In dark mode, use a lighter gray so dots are visible against dark canvas
+      dotColor = '#4a4a4a';
+    } else {
+      let primaryBg = getComputedStyle(root).getPropertyValue('--bg-primary');
+      if (!primaryBg || primaryBg.trim() === '') {
+        primaryBg = '#9a8a76'; // Fallback
+      } else {
+        primaryBg = primaryBg.trim();
+      }
+      dotColor = primaryBg;
+    }
+    
     dotsRef.current.forEach(dot => {
       ctx.beginPath();
       ctx.arc(dot.x, dot.y, dot.radius, 0, Math.PI * 2);
-      ctx.fillStyle = '#776e65';
+      ctx.fillStyle = dotColor;
       ctx.fill();
-      ctx.strokeStyle = 'rgba(120, 110, 100, 0.3)';
+      ctx.strokeStyle = dotColor;
       ctx.lineWidth = 0.5;
       ctx.stroke();
     });
@@ -262,7 +403,10 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
     snakes.forEach((snake, index) => {
       drawSnake(ctx, snake, index);
     });
-  }, [snakes, drawSnake]);
+
+    // Update and draw particles
+    updateParticles(ctx);
+  }, [snakes, drawSnake, updateParticles]);
 
   // Hover state changes are handled by the animation loop
 
@@ -454,8 +598,13 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
             // This snake has higher index - turn counter-clockwise to break deadlock
             directionChanged = snakeCopy.tryCounterClockwiseOrOther(ROWS, COLS, allSnakesCopy, snakeCopy.direction, snakeCopy.getHead());
           } else {
-            // Only this snake is moving, or other snake is not moving - turn clockwise
+            // Only this snake is moving, or other snake is not moving - try clockwise first (right turn) for balance
             directionChanged = snakeCopy.changeDirectionClockwise(ROWS, COLS, allSnakesCopy);
+            // If clockwise doesn't work (it will fallback to counter-clockwise internally), that's fine
+            // But if it completely fails, try counter-clockwise explicitly as final fallback
+            if (!directionChanged) {
+              directionChanged = snakeCopy.tryCounterClockwiseOrOther(ROWS, COLS, allSnakesCopy, snakeCopy.direction, snakeCopy.getHead());
+            }
           }
           
           if (directionChanged) {
@@ -489,7 +638,12 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
         
         // Check for other collisions (only check on-screen positions)
         if (snakeCopy.hasCollided(allSnakesCopy, ROWS, COLS)) {
-          // Snake collided - vibrate, remove it and clean up interval
+          // Snake collided - create particle effect at head position
+          const headPos = snakeCopy.getHead();
+          const headCanvasPos = gridToCanvas(headPos.row, headPos.col);
+          createParticles(headCanvasPos.x, headCanvasPos.y, snakeCopy.color);
+          
+          // Vibrate, remove it and clean up interval
           if ('vibrate' in navigator) {
             navigator.vibrate(200); // Vibrate for 200ms
           }
@@ -554,7 +708,12 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
         
         // Check if completely off-screen after move
         if (snakeCopy.isCompletelyOffScreen(ROWS, COLS)) {
-          // Snake is completely off-screen - remove it and clean up interval
+          // Snake is completely off-screen - create particle effect at head position
+          const headPos = snakeCopy.getHead();
+          const headCanvasPos = gridToCanvas(headPos.row, headPos.col);
+          createParticles(headCanvasPos.x, headCanvasPos.y, snakeCopy.color);
+          
+          // Remove it and clean up interval
           const interval = animationIntervalsRef.current.get(snakeIndex);
           if (interval) {
             clearInterval(interval);
@@ -693,7 +852,7 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
     
     // Store the interval ID for this snake
     animationIntervalsRef.current.set(snakeIndex, intervalId);
-  }, [checkNoMoves, onNoMoves, getSnakeSpeed]);
+  }, [checkNoMoves, onNoMoves, getSnakeSpeed, gridToCanvas, createParticles]);
 
   // Handle mouse/touch hover and interaction
   useEffect(() => {
@@ -1286,7 +1445,17 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
     canUndo: () => historyRef.current.length > 0,
     updateColors: () => {
       // Update all existing snake colors from CSS variable
-      const newColor = getComputedStyle(document.documentElement).getPropertyValue('--game-snake-color').trim() || '#e74c3c';
+      // Force a reflow to ensure CSS variables are updated
+      const root = document.documentElement;
+      root.offsetHeight; // Force reflow
+      
+      let newColor = getComputedStyle(root).getPropertyValue('--game-snake-color');
+      if (!newColor || newColor.trim() === '') {
+        newColor = '#e74c3c'; // Fallback to default red
+      } else {
+        newColor = newColor.trim();
+      }
+      
       setSnakes(prevSnakes => {
         const updatedSnakes = prevSnakes.map(snake => {
           const updatedSnake = new Snake([...snake.gridPositions], newColor);
@@ -1296,6 +1465,18 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
         snakesRef.current = updatedSnakes;
         return updatedSnakes;
       });
+      // Force a redraw to update dots and background
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      animationFrameRef.current = requestAnimationFrame(() => {
+        draw();
+      });
+    },
+    forceRedraw: () => {
+      // Force a complete redraw of the canvas
+      // Call draw directly to ensure it uses the latest CSS variables
+      draw();
     },
     getState: () => {
       // Return serializable state
