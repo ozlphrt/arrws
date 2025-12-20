@@ -150,7 +150,7 @@ function App() {
   const [showGameOverModal, setShowGameOverModal] = useState(false);
   const [showNewGameConfirmModal, setShowNewGameConfirmModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [selectedPalette, setSelectedPalette] = useState(0);
+  const [selectedPalette, setSelectedPalette] = useState(0); // Default to Warm Earth
   const [darkMode, setDarkMode] = useState(false);
   const [level, setLevel] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
@@ -518,7 +518,8 @@ function App() {
         applyPalette(paletteIndex);
       }
     } else {
-      applyPalette(0); // Apply default palette
+      applyPalette(0); // Apply default palette (Warm Earth)
+      setSelectedPalette(0);
     }
   }, [applyPalette]);
 
