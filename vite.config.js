@@ -2,7 +2,15 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
-const base = process.env.NODE_ENV === 'production' ? '/arrws/' : '/';
+// Base path can be set via VITE_BASE_PATH env var, defaults to /arrws/ for production
+const getBasePath = () => {
+  if (process.env.VITE_BASE_PATH) {
+    return process.env.VITE_BASE_PATH;
+  }
+  return process.env.NODE_ENV === 'production' ? '/arrws/' : '/';
+};
+
+const base = getBasePath();
 
 export default defineConfig({
   base,
@@ -43,7 +51,7 @@ export default defineConfig({
             urlPattern: /^https:\/\/ozlphrt\.github\.io\/arrws\/.*/i,
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'arrws-cache',
+              cacheName: base.includes('v2') ? 'arrws-v2-cache' : 'arrws-cache',
               expiration: {
                 maxEntries: 50,
                 maxAgeSeconds: 60 * 60 * 24 * 7 // 7 days
