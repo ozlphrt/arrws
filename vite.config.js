@@ -48,7 +48,8 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/ozlphrt\.github\.io\/arrws\/.*/i,
+            // Dynamic urlPattern based on base path - escape special regex chars in base path
+            urlPattern: new RegExp(`^https://ozlphrt\\.github\\.io${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}.*`, 'i'),
             handler: 'NetworkFirst',
             options: {
               cacheName: base.includes('v2') ? 'arrws-v2-cache' : 'arrws-cache',
