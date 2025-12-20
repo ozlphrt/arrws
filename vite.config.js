@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
-const base = process.env.NODE_ENV === 'production' ? '/arrws/' : '/';
+const base = process.env.NODE_ENV === 'production' ? '/arrws/v2/' : '/';
 
 export default defineConfig({
   base,
@@ -40,10 +40,10 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/ozlphrt\.github\.io\/arrws\/.*/i,
+            urlPattern: /^https:\/\/ozlphrt\.github\.io\/arrws\/v2\/.*/i,
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'arrws-cache',
+              cacheName: 'arrws-v2-cache',
               expiration: {
                 maxEntries: 50,
                 maxAgeSeconds: 60 * 60 * 24 * 7 // 7 days
