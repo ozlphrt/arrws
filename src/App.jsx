@@ -18,30 +18,30 @@ const COLOR_PALETTES = [
     dotStroke: 'rgba(120, 110, 100, 0.3)'
   },
   {
-    name: 'Cool Sage',
-    bgPrimary: '#8a9a8a',
-    bgSecondary: '#f0f5f2',
-    bgTertiary: '#a8b8a8',
-    textPrimary: '#5a6a5a',
-    textSecondary: '#f0f5f2',
-    btnAccent: '#8db88d',
-    btnAccentHover: '#9dc89d',
-    snakeColor: '#4a8a4a',
-    dotFill: '#5a6a5a',
-    dotStroke: 'rgba(90, 106, 90, 0.3)'
+    name: 'Autumn Leaves',
+    bgPrimary: '#a68a7a',
+    bgSecondary: '#faf5f0',
+    bgTertiary: '#c8b0a0',
+    textPrimary: '#7a6a5a',
+    textSecondary: '#faf5f0',
+    btnAccent: '#d8a878',
+    btnAccentHover: '#e8b888',
+    snakeColor: '#c8784a',
+    dotFill: '#7a6a5a',
+    dotStroke: 'rgba(122, 106, 90, 0.3)'
   },
   {
-    name: 'Soft Lavender',
-    bgPrimary: '#9a8a9a',
-    bgSecondary: '#f5f0f5',
-    bgTertiary: '#bbadb8',
-    textPrimary: '#776775',
-    textSecondary: '#f9f6f9',
-    btnAccent: '#c8a8c8',
-    btnAccentHover: '#d8b8d8',
-    snakeColor: '#8a5a9a',
-    dotFill: '#776775',
-    dotStroke: 'rgba(119, 103, 117, 0.3)'
+    name: 'Misty Morning',
+    bgPrimary: '#8a9a9a',
+    bgSecondary: '#f0f5f5',
+    bgTertiary: '#a8b8b8',
+    textPrimary: '#6a7a7a',
+    textSecondary: '#f0f5f5',
+    btnAccent: '#a8c8c8',
+    btnAccentHover: '#b8d8d8',
+    snakeColor: '#5a8a9a',
+    dotFill: '#6a7a7a',
+    dotStroke: 'rgba(106, 122, 122, 0.3)'
   },
   {
     name: 'Ocean Breeze',
@@ -57,17 +57,17 @@ const COLOR_PALETTES = [
     dotStroke: 'rgba(90, 106, 122, 0.3)'
   },
   {
-    name: 'Dusty Rose',
-    bgPrimary: '#9a8a85',
-    bgSecondary: '#f5f0ed',
-    bgTertiary: '#bbada8',
-    textPrimary: '#776765',
-    textSecondary: '#f9f6f4',
-    btnAccent: '#d8a8a8',
-    btnAccentHover: '#e8b8b8',
-    snakeColor: '#c85a5a',
-    dotFill: '#776765',
-    dotStroke: 'rgba(119, 103, 101, 0.3)'
+    name: 'Sunset Glow',
+    bgPrimary: '#b89a8a',
+    bgSecondary: '#faf5f0',
+    bgTertiary: '#d8c0b0',
+    textPrimary: '#8a7a6a',
+    textSecondary: '#faf5f0',
+    btnAccent: '#e8a878',
+    btnAccentHover: '#f8b888',
+    snakeColor: '#d8785a',
+    dotFill: '#8a7a6a',
+    dotStroke: 'rgba(138, 122, 106, 0.3)'
   },
   {
     name: 'Forest Green',
@@ -83,43 +83,43 @@ const COLOR_PALETTES = [
     dotStroke: 'rgba(90, 106, 90, 0.3)'
   },
   {
-    name: 'Warm Sand',
-    bgPrimary: '#a89a8a',
+    name: 'Deep Forest',
+    bgPrimary: '#6a7a6a',
+    bgSecondary: '#f0f5f0',
+    bgTertiary: '#90a090',
+    textPrimary: '#4a5a4a',
+    textSecondary: '#f0f5f0',
+    btnAccent: '#6aa86a',
+    btnAccentHover: '#7ab87a',
+    snakeColor: '#3a7a3a',
+    dotFill: '#4a5a4a',
+    dotStroke: 'rgba(74, 90, 74, 0.3)'
+  },
+  {
+    name: 'Twilight',
+    bgPrimary: '#8a7a9a',
+    bgSecondary: '#f5f0f5',
+    bgTertiary: '#a898b8',
+    textPrimary: '#6a5a7a',
+    textSecondary: '#f5f0f5',
+    btnAccent: '#b8a8d8',
+    btnAccentHover: '#c8b8e8',
+    snakeColor: '#7a5a9a',
+    dotFill: '#6a5a7a',
+    dotStroke: 'rgba(106, 90, 122, 0.3)'
+  },
+  {
+    name: 'Desert Bloom',
+    bgPrimary: '#b89a85',
     bgSecondary: '#faf5f0',
-    bgTertiary: '#c8b8a8',
-    textPrimary: '#8a7a6a',
+    bgTertiary: '#d8c0a8',
+    textPrimary: '#8a7a65',
     textSecondary: '#faf5f0',
-    btnAccent: '#e8c8a8',
-    btnAccentHover: '#f8d8b8',
-    snakeColor: '#c8783a',
-    dotFill: '#8a7a6a',
-    dotStroke: 'rgba(138, 122, 106, 0.3)'
-  },
-  {
-    name: 'Muted Blue',
-    bgPrimary: '#8a9aa8',
-    bgSecondary: '#f0f2f5',
-    bgTertiary: '#a8b8c8',
-    textPrimary: '#6a7a8a',
-    textSecondary: '#f0f2f5',
-    btnAccent: '#a8c8e8',
-    btnAccentHover: '#b8d8f8',
-    snakeColor: '#7aa8c8',
-    dotFill: '#6a7a8a',
-    dotStroke: 'rgba(106, 122, 138, 0.3)'
-  },
-  {
-    name: 'Earthy Brown',
-    bgPrimary: '#8a7a6a',
-    bgSecondary: '#f5f0ea',
-    bgTertiary: '#a89888',
-    textPrimary: '#6a5a4a',
-    textSecondary: '#f5f0ea',
-    btnAccent: '#c8a878',
-    btnAccentHover: '#d8b888',
-    snakeColor: '#b85a3a',
-    dotFill: '#6a5a4a',
-    dotStroke: 'rgba(106, 90, 74, 0.3)'
+    btnAccent: '#e8b898',
+    btnAccentHover: '#f8c8a8',
+    snakeColor: '#d88a5a',
+    dotFill: '#8a7a65',
+    dotStroke: 'rgba(138, 122, 101, 0.3)'
   },
   {
     name: 'Soft Gray',
@@ -368,6 +368,7 @@ function App() {
   }, []);
 
   const handleNoMoves = useCallback(() => {
+    // Game Over modal disabled - do nothing
     // Check if completion was already detected - if so, don't show game over
     if (completionDetectedRef.current) {
       return; // Completion was detected, don't show game over
@@ -388,13 +389,19 @@ function App() {
       }
     }
     
-    setShowGameOverModal(true);
+    // Game Over modal disabled - commented out
+    // setShowGameOverModal(true);
     // Stop the timer
     if (timeIntervalRef.current) {
       clearInterval(timeIntervalRef.current);
       timeIntervalRef.current = null;
     }
   }, [showCompletionModal]);
+
+  const handleSnakeRestored = useCallback(() => {
+    // Restore a life when a snake is restored via undo
+    setLives(prev => Math.min(3, prev + 1));
+  }, []);
 
   const handleSnakesChange = useCallback(() => {
     if (!isLoading) {
@@ -550,7 +557,7 @@ function App() {
       setLevel(savedState.level);
       setScore(savedState.score);
       setTime(savedState.time);
-      setLives(savedState.lives);
+      setLives(3); // Always reset to 3
       setGameStarted(savedState.gameStarted);
       
       // Restore timer if game was started
@@ -716,6 +723,7 @@ function App() {
             onGameStart={handleGameStart}
             removeMode={removeMode}
             onSnakeRemoved={handleSnakeRemoved}
+            onSnakeRestored={handleSnakeRestored}
             onUndoStateChange={handleUndoStateChange}
             onAllSnakesCleared={handleAllSnakesCleared}
             onNoMoves={handleNoMoves}

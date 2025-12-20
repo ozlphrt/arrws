@@ -1283,26 +1283,17 @@
     min-width: 200px;
     padding: var(--padding-sm);
   }
+}
 
-  .palette-picker {
+/* Fix for iPhone 13 Pro and similar smaller iPhones */
+@media (max-width: 390px) {
+  .settings-toggle-btn {
+    right: calc(var(--padding-md) + env(safe-area-inset-right, 0px) + 8px);
     padding: var(--padding-xs);
   }
 
-  .palette-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: var(--margin-xs);
-  }
-
-  .palette-option {
-    padding: var(--padding-xs);
-  }
-
-  .palette-preview {
-    height: 20px;
-  }
-
-  .palette-name {
-    font-size: 9px;
+  .settings-menu {
+    right: calc(var(--padding-md) + env(safe-area-inset-right, 0px) + 8px);
   }
 }
 

@@ -4,7 +4,7 @@ import { Snake, generateRandomSnake, isPuzzleSolvable } from '../utils/snake';
 const ROWS = 36;
 const COLS = 18;
 
-const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpdate, onGameStart, removeMode = false, onSnakeRemoved, onUndoStateChange, onAllSnakesCleared, onNoMoves, onSnakesChange, level = 1, initialSnakeState = null }, ref) {
+const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpdate, onGameStart, removeMode = false, onSnakeRemoved, onSnakeRestored, onUndoStateChange, onAllSnakesCleared, onNoMoves, onSnakesChange, level = 1, initialSnakeState = null }, ref) {
   const canvasRef = useRef(null);
   const dotsRef = useRef([]);
   const animationFrameRef = useRef(null);
@@ -25,6 +25,7 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
   // Refs to queue parent callbacks to avoid calling during render
   const pendingScoreUpdateRef = useRef(null);
   const pendingSnakeRemovedRef = useRef(false);
+  const pendingSnakeRestoredRef = useRef(false);
   const pendingUndoStateChangeRef = useRef(null);
   
   // Helper to save current state to history
@@ -182,26 +183,72 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
       snakeBody = snake.gridPositions.map(pos => gridToCanvas(pos.row, pos.col));
     }
     
-    // Draw snake body
+    // Draw snake body with shadow
     const snakeColor = snake.color;
-    const lineWidth = 8;
+    const lineWidth = 10;
     
-    ctx.strokeStyle = snakeColor;
-    ctx.fillStyle = snakeColor;
-    ctx.lineWidth = lineWidth;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    // Shadow offset: slightly down and right
+    const shadowOffsetX = 2;
+    const shadowOffsetY = 2;
+    
     // Enable smooth path rendering with anti-aliasing
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
 
     if (snakeBody.length === 1) {
-      // Single dot
+      // Single dot with shadow
       const pos = snakeBody[0];
+      
+      // Draw shadow
+      ctx.save();
+      ctx.globalAlpha = 0.2;
+      ctx.fillStyle = '#000000';
       ctx.beginPath();
-      ctx.arc(pos.x, pos.y, 4, 0, Math.PI * 2);
+      ctx.arc(pos.x + shadowOffsetX, pos.y + shadowOffsetY, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      
+      // Draw main dot
+      ctx.globalAlpha = 1.0;
+      ctx.fillStyle = snakeColor;
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, 5, 0, Math.PI * 2);
       ctx.fill();
     } else {
+      // Draw shadow first (behind the snake)
+      ctx.save();
+      ctx.globalAlpha = 0.2;
+      ctx.strokeStyle = '#000000';
+      ctx.fillStyle = '#000000';
+      ctx.lineWidth = lineWidth;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      
+      // Draw shadow path
+      ctx.beginPath();
+      ctx.moveTo(snakeBody[0].x + shadowOffsetX, snakeBody[0].y + shadowOffsetY);
+      for (let i = 1; i < snakeBody.length; i++) {
+        ctx.lineTo(snakeBody[i].x + shadowOffsetX, snakeBody[i].y + shadowOffsetY);
+      }
+      ctx.stroke();
+      
+      // Draw shadow segments
+      snakeBody.forEach((pos, index) => {
+        if (index === 0) return; // Skip head
+        ctx.beginPath();
+        ctx.arc(pos.x + shadowOffsetX, pos.y + shadowOffsetY, 5, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.restore();
+      
+      // Draw main snake body
+      ctx.strokeStyle = snakeColor;
+      ctx.fillStyle = snakeColor;
+      ctx.lineWidth = lineWidth;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.globalAlpha = 1.0;
+      
       // Draw path
       ctx.beginPath();
       ctx.moveTo(snakeBody[0].x, snakeBody[0].y);
@@ -210,11 +257,22 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
       }
       ctx.stroke();
 
-      // Draw body segments
+      // Draw body segments - make tail thinner when moving
+      const isMoving = animationIntervalsRef.current.has(snakeIndex);
       snakeBody.forEach((pos, index) => {
         if (index === 0) return; // Skip head, draw arrow separately
+        
+        // Calculate segment size - thinner towards tail when moving
+        let segmentSize = 5; // Default size
+        if (isMoving && snakeBody.length > 1) {
+          // Calculate progress from head (0) to tail (1)
+          const tailProgress = (index - 1) / (snakeBody.length - 2);
+          // Make tail progressively thinner: 5px at head, 2.5px at tail
+          segmentSize = 5 - (tailProgress * 2.5);
+        }
+        
         ctx.beginPath();
-        ctx.arc(pos.x, pos.y, 4, 0, Math.PI * 2);
+        ctx.arc(pos.x, pos.y, segmentSize, 0, Math.PI * 2);
         ctx.fill();
       });
     }
@@ -222,7 +280,7 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
     // Draw arrow head
     const headPos = snakeBody[0];
     const direction = snake.getHeadDirection();
-    const arrowSize = 18;
+    const arrowSize = 20;
 
     ctx.save();
     ctx.translate(headPos.x, headPos.y);
@@ -496,12 +554,12 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
   }, [gridToCanvas, distanceToLineSegment]);
 
   // Calculate movement speed based on snake length
-  // Longer snakes move faster: base speed 30ms, decreases by 0.4ms per segment
-  // Formula: interval = max(15, 30 - (length - 3) * 0.4)
-  // This gives: 3 segments = 30ms, 10 segments = 27ms, 20 segments = 23ms, 40 segments = 15ms
+  // Longer snakes move faster: base speed 25ms, decreases by 0.4ms per segment
+  // Formula: interval = max(12, 25 - (length - 3) * 0.4)
+  // This gives: 3 segments = 25ms, 10 segments = 22ms, 20 segments = 18ms, 40 segments = 12ms
   const getSnakeSpeed = useCallback((snakeLength) => {
-    const baseInterval = 30; // Base speed for shortest snakes
-    const minInterval = 15; // Minimum speed (fastest)
+    const baseInterval = 25; // Base speed for shortest snakes (reduced from 30ms)
+    const minInterval = 12; // Minimum speed (fastest, reduced from 15ms)
     const speedMultiplier = 0.4; // How much faster per additional segment
     const baseLength = 3; // Reference length
     return Math.max(minInterval, baseInterval - (snakeLength - baseLength) * speedMultiplier);
@@ -636,57 +694,74 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
           // If direction change failed or move failed, fall through to collision handling
         }
         
-        // Check for other collisions (only check on-screen positions)
-        if (snakeCopy.hasCollided(allSnakesCopy, ROWS, COLS)) {
-          // Snake collided - create particle effect at head position
-          const headPos = snakeCopy.getHead();
-          const headCanvasPos = gridToCanvas(headPos.row, headPos.col);
-          createParticles(headCanvasPos.x, headCanvasPos.y, snakeCopy.color);
-          
-          // Vibrate, remove it and clean up interval
-          if ('vibrate' in navigator) {
-            navigator.vibrate(200); // Vibrate for 200ms
-          }
-          const interval = animationIntervalsRef.current.get(snakeIndex);
-          if (interval) {
-            clearInterval(interval);
-            animationIntervalsRef.current.delete(snakeIndex);
-          }
-          animationStatesRef.current.delete(snakeIndex);
-          
-          // Remove the snake and update score
-          const updated = prevSnakes.filter((_, idx) => idx !== snakeIndex);
-          
-          // If this was the last snake, mark completion immediately and call it synchronously
-          if (updated.length === 0 && gameStartCalledRef.current && initialSnakeCountRef.current > 0 && !completionModalShownRef.current) {
-            completionModalShownRef.current = true;
-            // Stop all movements immediately
-            animationIntervalsRef.current.forEach((interval) => {
-              clearInterval(interval);
-            });
-            animationIntervalsRef.current.clear();
-            animationStatesRef.current.clear();
-            // Call completion handler immediately (synchronously) to prevent race condition
-            if (onAllSnakesCleared) {
-              // Use requestAnimationFrame to ensure it runs in the next frame, but before any setTimeout
-              requestAnimationFrame(() => {
-                if (completionModalShownRef.current && onAllSnakesCleared) {
-                  onAllSnakesCleared();
-                }
-              });
-            }
-          }
-          
-          if (onScoreUpdate && initialSnakeCountRef.current > 0) {
-            const removed = initialSnakeCountRef.current - updated.length;
-            pendingScoreUpdateRef.current = removed; // Queue for after render
-          }
-          return updated;
-        }
-        
+        // Try to move first
         const moved = snakeCopy.move(ROWS, COLS, allSnakesCopy);
         
         if (moved) {
+          // Update allSnakesCopy to include the moved snake for collision detection
+          const updatedAllSnakesCopy = allSnakesCopy.map((s, idx) => {
+            if (idx === snakeIndex) return snakeCopy;
+            return s;
+          });
+          
+          // After moving, check for collisions
+          const hasCollision = snakeCopy.hasCollided(updatedAllSnakesCopy, ROWS, COLS);
+          
+          if (hasCollision) {
+            // Snake collided - create particle effect at head position
+            const headPos = snakeCopy.getHead();
+            const headCanvasPos = gridToCanvas(headPos.row, headPos.col);
+            createParticles(headCanvasPos.x, headCanvasPos.y, snakeCopy.color);
+            
+            // Vibrate, remove it and clean up interval
+            if ('vibrate' in navigator) {
+              navigator.vibrate(200); // Vibrate for 200ms
+            }
+            const interval = animationIntervalsRef.current.get(snakeIndex);
+            if (interval) {
+              clearInterval(interval);
+              animationIntervalsRef.current.delete(snakeIndex);
+            }
+            animationStatesRef.current.delete(snakeIndex);
+            
+            // Remove the snake and update score
+            const updated = prevSnakes.filter((_, idx) => idx !== snakeIndex);
+            
+            // If this was the last snake, mark completion immediately and call it synchronously
+            if (updated.length === 0 && gameStartCalledRef.current && initialSnakeCountRef.current > 0 && !completionModalShownRef.current) {
+              completionModalShownRef.current = true;
+              // Stop all movements immediately
+              animationIntervalsRef.current.forEach((interval) => {
+                clearInterval(interval);
+              });
+              animationIntervalsRef.current.clear();
+              animationStatesRef.current.clear();
+              // Call completion handler immediately (synchronously) to prevent race condition
+              if (onAllSnakesCleared) {
+                // Use requestAnimationFrame to ensure it runs in the next frame, but before any setTimeout
+                requestAnimationFrame(() => {
+                  onAllSnakesCleared();
+                });
+              }
+            }
+            
+            // Update score
+            if (onScoreUpdate && initialSnakeCountRef.current > 0) {
+              const removedCount = initialSnakeCountRef.current - updated.length;
+              const newScore = removedCount * 10;
+              pendingScoreUpdateRef.current = newScore;
+            }
+            
+            // Notify parent about snake removal (queue for after render)
+            if (onSnakeRemoved) {
+              pendingSnakeRemovedRef.current = true;
+            }
+            
+            snakesRef.current = updated;
+            return updated;
+          }
+          
+          // No collision, continue with normal movement
           // Mark first movement to trigger timer start
           if (!gameStartCalledRef.current) {
             gameStartCalledRef.current = true;
@@ -882,7 +957,8 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
         if (removeMode) {
           setSnakes(prevSnakes => {
             if (snakeIndex < prevSnakes.length) {
-              // Save state before removal
+              // Save state before removal - uses same history stack as movement operations
+              // Undo will restore in LIFO order (most recent first)
               saveStateToHistory(prevSnakes);
               
               // Clean up animation intervals
@@ -1069,6 +1145,14 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
       pendingSnakeRemovedRef.current = false;
       setTimeout(() => {
         onSnakeRemoved();
+      }, 0);
+    }
+    
+    // Handle snake restored (via undo)
+    if (pendingSnakeRestoredRef.current && onSnakeRestored) {
+      pendingSnakeRestoredRef.current = false;
+      setTimeout(() => {
+        onSnakeRestored();
       }, 0);
     }
     
@@ -1417,6 +1501,9 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
         return false; // No history to undo
       }
       
+      // Track current snake count to detect if a removed snake is being restored
+      const currentSnakeCount = snakesRef.current.length;
+      
       // Stop all moving snakes
       animationIntervalsRef.current.forEach((interval) => {
         clearInterval(interval);
@@ -1432,8 +1519,17 @@ const DotCanvas = forwardRef(function DotCanvas({ onTap, tapPosition, onScoreUpd
         return snake;
       });
       
+      // Check if a snake was restored (count increased)
+      const restoredSnakeCount = restoredSnakes.length;
+      const snakeWasRestored = restoredSnakeCount > currentSnakeCount;
+      
       setSnakes(restoredSnakes);
       snakesRef.current = restoredSnakes;
+      
+      // If a snake was restored (undo of removal), notify parent to restore life
+      if (snakeWasRestored && onSnakeRestored) {
+        pendingSnakeRestoredRef.current = true;
+      }
       
       // Update undo availability (queue for after render)
       if (onUndoStateChange) {
